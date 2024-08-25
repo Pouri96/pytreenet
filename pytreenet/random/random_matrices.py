@@ -18,7 +18,7 @@ def random_matrix(size: int = 2) -> np.ndarray:
         np.ndarray: The random matrix.
     """
     positivity_check(size, "size")
-    return crandn((size,size))
+    return crandn((2,2))
 
 def random_hermitian_matrix(size: int = 2) -> np.ndarray:
     """
