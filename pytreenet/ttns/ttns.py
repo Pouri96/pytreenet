@@ -150,4 +150,12 @@ def normalize_ttn(ttn: TreeTensorNetworkState , to_copy = False):
           ttn_normalized.tensors[node_id] /= np.sqrt(norm)
    return ttn_normalized 
 
+def normalize_ttn_Lindblad(ttn) : 
+    ttn_normalized = copy_object(ttn, deep = True)
+    I = TTNO.Identity(ttn_normalized)
+    for node_id in list(ttn_normalized.nodes.keys()):
+        norm = ttn_normalized.operator_expectation_value_Lindblad(I)
+        ttn_normalized.tensors[node_id] /= np.sqrt(norm)
+    return ttn_normalized
+
 TTNS = TreeTensorNetworkState

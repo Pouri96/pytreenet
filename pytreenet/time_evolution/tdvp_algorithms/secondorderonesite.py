@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from ...operators.tensorproduct import TensorProduct
 from ...ttno.ttno import TTNO
-from ...ttns import TreeTensorNetworkState
+from ...ttns import TreeTensorNetworkState , normalize_ttn_Lindblad
 from ..ttn_time_evolution import TTNTimeEvolutionConfig
 from ..Subspace_expansion import expand_subspace , KrylovBasisMode , max_two_neighbour_form , original_form
 from ...util.tensor_splitting import SplitMode , SVDParameters
@@ -68,8 +68,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          max_bond,
                          KrylovBasisMode,  
                          config)
-        self.backwards_update_path = self._init_second_order_update_path()
-        self.backwards_orth_path = self._init_second_order_orth_path()
+    
         self.state , self.hamiltonian , self.two_neighbour_form_dict = self._init_two_neighbour_form()
 
     def _init_two_neighbour_form(self):
@@ -286,6 +285,11 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                     tol_step += 1
                 #state_copy = deepcopy(self.state)    
                 self.run_one_time_step_ex(i, tol_step)
+                if self.Lindblad :
+                    ttn = deepcopy(self.state)
+                    ttn = original_form(ttn , self.two_neighbour_form_dict)
+                    self.state = normalize_ttn_Lindblad(ttn)
+                    max_two_neighbour_form(self.state , self.two_neighbour_form_dict)
                 #self.state = adjust_ttn1_structure_to_ttn2(self.state, state_copy)
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
