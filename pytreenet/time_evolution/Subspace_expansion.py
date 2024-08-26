@@ -10,7 +10,7 @@ from ..ttno.ttno import TTNO
 from ..util.tensor_splitting import SVDParameters , ContractionMode
 from ..time_evolution.time_evo_util.update_path import TDVPUpdatePathFinder
 from ..core.leg_specification import LegSpecification
-from ..core.canonical_form import adjust_ttn1_structure_to_ttn2
+from ..core.canonical_form import adjust_ttn1_structure_to_ttn2 , adjust_ttno_structure_to_ttn
 from copy import copy
 from enum import Enum
 
@@ -77,6 +77,10 @@ def expand_subspace(ttn: TreeTensorNetworkState,
                     SVDParameters : SVDParameters = SVDParameters(),
                     tol = 1e-04,
                     mode: KrylovBasisMode = KrylovBasisMode.apply_ham):
+    #ttno = adjust_ttno_structure_to_ttn(ttno , ttn)
+    #ttn , dict1 = max_two_neighbour_form(ttn)
+    #ttno , dict2 = max_two_neighbour_form(ttno , dict1) 
+    #assert dict1 == dict2
     if mode == KrylovBasisMode.apply_ham:
         basis = Krylov_basis2(ttn,ttno,num_vecs,SVDParameters)    
     elif mode == KrylovBasisMode.apply_1st_order_expansion:
@@ -86,6 +90,7 @@ def expand_subspace(ttn: TreeTensorNetworkState,
     for i in range(len(basis)-1):
         ttn_copy = enlarge_ttn1_bond_with_ttn2(ttn_copy, basis[i+1], tol)
         #ttn_copy.normalize_ttn()
+    #ttn_copy = original_form(ttn_copy , dict1)    
     return ttn_copy
 
 

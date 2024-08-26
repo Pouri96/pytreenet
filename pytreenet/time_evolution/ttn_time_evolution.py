@@ -8,6 +8,7 @@ from .time_evolution import TimeEvolution
 from ..ttns import TreeTensorNetworkState
 from ..ttno import TTNO
 from ..operators.tensorproduct import TensorProduct
+from ..ttns.ttns import normalize_ttn_Lindblad
 from pytreenet.time_evolution.Subspace_expansion import contract_ttno_with_ttn
 from pytreenet.contractions.state_state_contraction import contract_ttn_Lindblad 
 from pytreenet.time_evolution.Subspace_expansion import original_form
@@ -152,10 +153,15 @@ class TTNTimeEvolution(TimeEvolution):
         #    return contract_ttn_Lindblad(op_state)  
         #   
             ttn = deepcopy(self.state)
+            #ttn = original_form(ttn , self.two_neighbour_form_dict)
+            #ttn = normalize_ttn_Lindblad(ttn)
+            ttno = deepcopy(operator)
+            # max_two_neighbour_form(self.state , self.two_neighbour_form_dict)
+            # self.partial_tree_cache = PartialTreeCachDict()
+            # self._init_partial_tree_cache()   
+            return ttn.operator_expectation_value_Lindblad(ttno)   
+        else:  
+            ttn = deepcopy(self.state)
             ttno = deepcopy(operator)
             ttn = original_form(ttn , self.two_neighbour_form_dict)
-            return ttn.operator_expectation_value_Lindblad(ttno)     
-        #ttn = deepcopy(self.state)
-        #ttno = deepcopy(operator)
-        #ttn = original_form(ttn , self.two_neighbour_form_dict)
-        #return ttn.operator_expectation_value(ttno)       
+            return ttn.operator_expectation_value(ttno)       

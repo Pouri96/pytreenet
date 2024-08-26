@@ -68,7 +68,8 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          max_bond,
                          KrylovBasisMode,  
                          config)
-    
+        self.backwards_update_path = self._init_second_order_update_path()
+        self.backwards_orth_path = self._init_second_order_orth_path()
         self.state , self.hamiltonian , self.two_neighbour_form_dict = self._init_two_neighbour_form()
 
     def _init_two_neighbour_form(self):
@@ -81,6 +82,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self.hamiltonian , dict2 = max_two_neighbour_form(self.hamiltonian , dict1)
         #self.hamiltonian = adjust_ttno_structure_to_ttn(tdvp_ex1.hamiltonian , tdvp_ex1.state)
         assert dict1 == dict2
+        self.partial_tree_cache = PartialTreeCachDict()
         self._init_partial_tree_cache()
         self.update_path = TDVPUpdatePathFinder(self.state).find_path()
         self.orthogonalization_path = self._find_tdvp_orthogonalization_path(self.update_path) 
@@ -233,10 +235,10 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             self.state = state_ex
             #self.state = adjust_ttn1_structure_to_ttn2( state_ex, state_copy)
             self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
+            self.partial_tree_cache = PartialTreeCachDict()
             self._init_partial_tree_cache()
         else:
-            self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
-            self._init_partial_tree_cache()
+            assert self.state.orthogonality_center_id == self.update_path[0]
         for i, node_id in enumerate(self.update_path[:-1]):
             # Orthogonalize
             if i>0:
@@ -284,19 +286,23 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 if i % self.expansion_steps == 0:
                     tol_step += 1
                 #state_copy = deepcopy(self.state)    
-                self.run_one_time_step_ex(i, tol_step)
+                self.run_one_time_step_ex(i, tol_step)      
+                #self.state = adjust_ttn1_structure_to_ttn2(self.state, state_copy)
+            if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 if self.Lindblad :
                     ttn = deepcopy(self.state)
                     ttn = original_form(ttn , self.two_neighbour_form_dict)
-                    self.state = normalize_ttn_Lindblad(ttn)
-                    max_two_neighbour_form(self.state , self.two_neighbour_form_dict)
-                #self.state = adjust_ttn1_structure_to_ttn2(self.state, state_copy)
-            if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
+                    ttn = normalize_ttn_Lindblad(ttn)
+                    self.state = normalize_ttn_Lindblad(ttn) 
                 index = i // evaluation_time
                 current_results = self.evaluate_operators()
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size
+                max_two_neighbour_form(self.state , self.two_neighbour_form_dict)
+                self.partial_tree_cache = PartialTreeCachDict()
+                self._init_partial_tree_cache()              
+        
         if evaluation_time == "inf":
             current_results = self.evaluate_operators()
             self._results[0:-1, 0] = current_results
