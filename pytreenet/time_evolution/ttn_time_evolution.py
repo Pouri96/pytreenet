@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import List, Union, Dict, Tuple
 from dataclasses import dataclass
 
+import numpy as np
 from numpy import ndarray
 from copy import deepcopy
 from .time_evolution import TimeEvolution
@@ -130,7 +131,15 @@ class TTNTimeEvolution(TimeEvolution):
         Evaluates the operator including the recording of bond dimensions.
         """
         current_results = super().evaluate_operators()
-        self.record_bond_dimensions()
+        #self.record_bond_dimensions()
+        return current_results
+
+    def evaluate_operators(self) -> ndarray:
+        """
+        Evaluates the operator including the recording of bond dimensions.
+        """
+        current_results = super().evaluate_operators()
+        #self.record_bond_dimensions()
         return current_results
 
     def evaluate_operator(self, operator: Union[TensorProduct,TTNO]) -> complex:
@@ -153,13 +162,10 @@ class TTNTimeEvolution(TimeEvolution):
         #    return contract_ttn_Lindblad(op_state)  
         #   
             ttn = deepcopy(self.state)
-            #ttn = original_form(ttn , self.two_neighbour_form_dict)
-            #ttn = normalize_ttn_Lindblad(ttn)
-            ttno = deepcopy(operator)
-            # max_two_neighbour_form(self.state , self.two_neighbour_form_dict)
-            # self.partial_tree_cache = PartialTreeCachDict()
-            # self._init_partial_tree_cache()   
-            return ttn.operator_expectation_value_Lindblad(ttno)   
+            # ttn = original_form(ttn , self.two_neighbour_form_dict)
+            # ttn = normalize_ttn_Lindblad(ttn)
+            ttno = deepcopy(operator)  
+            return ttn.operator_expectation_value_Lindblad(ttno)
         else:  
             ttn = deepcopy(self.state)
             ttno = deepcopy(operator)

@@ -153,9 +153,44 @@ def normalize_ttn(ttn: TreeTensorNetworkState , to_copy = False):
 def normalize_ttn_Lindblad(ttn) : 
     ttn_normalized = copy_object(ttn, deep = True)
     I = TTNO.Identity(ttn_normalized)
-    for node_id in list(ttn_normalized.nodes.keys()):
+    norm = ttn_normalized.operator_expectation_value_Lindblad(I)
+    n = len(ttn.nodes) // 2
+    norm = np.sqrt(norm ** (1/n))
+    for ket_id in list(ttn.nodes.keys())[0:len(ttn.nodes)//2]:
+        i, j = ket_id.replace('Site(', '').replace(')', '').split(',')
+        bra_id = f"Node({i},{j})"
+        T = ttn_normalized.tensors[ket_id].astype(complex)
+        T /= norm
+        ttn_normalized.tensors[ket_id] = T
+        ttn_normalized.nodes[ket_id].link_tensor(T)
+
+        T = ttn_normalized.tensors[bra_id].astype(complex)
+        T /= norm.conj()
+        ttn_normalized.tensors[bra_id] = T
+        ttn_normalized.nodes[bra_id].link_tensor(T)
+
+    return ttn_normalized
+
+#def normalize_ttn_Lindblad(ttn) : 
+    ttn_normalized = copy_object(ttn, deep = True)
+    I = TTNO.Identity(ttn_normalized)
+    for ket_id in list(ttn.nodes.keys())[0:len(ttn.nodes)//2]:
+        i, j = ket_id.replace('Site(', '').replace(')', '').split(',')
+        bra_id = f"Node({i},{j})"
+
         norm = ttn_normalized.operator_expectation_value_Lindblad(I)
-        ttn_normalized.tensors[node_id] /= np.sqrt(norm)
+        norm = np.sqrt(norm)
+
+        T = ttn_normalized.tensors[ket_id].astype(complex)
+        T /= norm
+        ttn_normalized.tensors[ket_id] = T
+        ttn_normalized.nodes[ket_id].link_tensor(T)
+
+        T = ttn_normalized.tensors[bra_id].astype(complex)
+        T /= norm.conj()
+        ttn_normalized.tensors[bra_id] = T
+        ttn_normalized.nodes[bra_id].link_tensor(T)
+
     return ttn_normalized
 
 TTNS = TreeTensorNetworkState

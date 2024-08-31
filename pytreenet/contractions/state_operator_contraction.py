@@ -232,9 +232,10 @@ def adjust_bra_to_ket(state):
             neighbours = convert_sites_and_nodes(neighbours)
             transpose_node_with_neighbouring_nodes(state, bra_id, neighbours) 
 
-def expectation_value_Lindblad(state: TreeTensorNetworkState,
-                               operator: TTNO) -> complex:
-
+def expectation_value_Lindblad(ttn: TreeTensorNetworkState,
+                               ttno: TTNO) -> complex:
+    state = deepcopy(ttn)
+    operator = deepcopy(ttno)
     adjust_operator_to_ket(operator,state)
     adjust_bra_to_ket(state)
     dict = contract_all_except_root(state, operator)
