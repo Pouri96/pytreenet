@@ -296,11 +296,12 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             ttn = original_form(ttn , self.two_neighbour_form_dict)
             I = TTNO.Identity(ttn)
             I_ex = ttn.operator_expectation_value_Lindblad(I)
-            norm = I_ex
             if np.abs(np.abs(I_ex) - 1)  > self.norm_tol :
-                self.state = normalize_ttn_Lindblad(ttn)     
+                self.state = normalize_ttn_Lindblad(ttn) 
+                norm = self.state.operator_expectation_value_Lindblad(I)
             else:
-                self.state = ttn                   
+                self.state = ttn  
+                norm = I_ex                 
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
                 current_results = self.evaluate_operators() / norm
