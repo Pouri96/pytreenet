@@ -39,7 +39,8 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                  tau: float = 1e-2, 
                  SVDParameters : SVDParameters = SVDParameters(),
                  expansion_steps: int = 10,
-                 initial_tol: float = 1e-5,
+                 initial_tol: float = 1e-20,
+                 final_tol: float = 1e-50,
                  tol_step: float = 1e-1, 
                  max_bond: int = 32, 
                  norm_tol: float = np.inf,
@@ -66,6 +67,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          expansion_steps,
                          initial_tol,
                          tol_step,
+                         final_tol,
                          max_bond,
                          KrylovBasisMode,  
                          config)
@@ -267,7 +269,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 the path to that file can be specified here. Defaults to "".
             pgbar (bool, optional): Toggles the progress bar. Defaults to True.
         """
-      
+
         self._init_results(evaluation_time)
         assert self._results is not None
         tol_step = -1
@@ -275,10 +277,12 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if i != 0:  # We also measure the initial expectation_values   
 
                 ###########
-                tol_step += 1
                 if i % self.expansion_steps == 0 :
+                    tol_step += 1
                     if state_bond.max_bond_dim() < self.max_bond:
                         tol = self.initial_tol * self.tol_step ** tol_step
+                        if tol > self.final_tol:
+                           tol = self.final_tol
                         state_ex = expand_subspace(state_ex, self.hamiltonian, 
                                                     self.num_vecs, self.tau, 
                                                     self.SVDParameters, tol, self.KrylovBasisMode)

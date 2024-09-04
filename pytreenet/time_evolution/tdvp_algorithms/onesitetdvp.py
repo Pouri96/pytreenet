@@ -34,6 +34,7 @@ class OneSiteTDVP(TDVPAlgorithm):
                  SVDParameters : SVDParameters = SVDParameters(),
                  expansion_steps: int = 10,
                  initial_tol: float = 1e-5,
+                 final_tol: float = 1e-10,
                  tol_step: float = 1e-1, 
                  max_bond: int = 32,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                
@@ -48,6 +49,7 @@ class OneSiteTDVP(TDVPAlgorithm):
         self.SVDParameters = SVDParameters
         self.expansion_steps = expansion_steps   
         self.initial_tol = initial_tol
+        self.final_tol = final_tol
         self.tol_step = tol_step 
         self.max_bond = max_bond  
         self.KrylovBasisMode = KrylovBasisMode
