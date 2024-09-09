@@ -41,7 +41,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                  expansion_steps: int = 10,
                  initial_tol: float = 1e-20,
                  final_tol: float = 1e-50,
-                 tol_step: float = 1e-1, 
+                 tol_step: float = 1, 
                  max_bond: int = 32, 
                  norm_tol: float = np.inf,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                  
@@ -66,8 +66,8 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          SVDParameters,
                          expansion_steps,
                          initial_tol,
-                         tol_step,
                          final_tol,
+                         tol_step,
                          max_bond,
                          KrylovBasisMode,  
                          config)
@@ -277,49 +277,35 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if i != 0:  # We also measure the initial expectation_values   
 
                 ###########
-                if i % self.expansion_steps == 0 :
+                if i % self.expansion_steps == 0 and self.state.max_bond_dim() < self.max_bond :
                     tol_step += 1
-                    if state_bond.max_bond_dim() < self.max_bond:
-                        tol = self.initial_tol * self.tol_step ** tol_step
-                        if tol > self.final_tol:
-                           tol = self.final_tol
-                        state_ex = expand_subspace(state_ex, self.hamiltonian, 
-                                                    self.num_vecs, self.tau, 
-                                                    self.SVDParameters, tol, self.KrylovBasisMode)
+
+                    tol = self.initial_tol * self.tol_step ** tol_step
+                    if tol > self.final_tol:
+                        tol = self.final_tol
+                    state_ex = expand_subspace(self.state, self.hamiltonian, 
+                                                self.num_vecs, self.tau, 
+                                                self.SVDParameters, tol, self.KrylovBasisMode)
+                    if state_ex.max_bond_dim() < self.max_bond:
                         self.state = state_ex
                         self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
                         self.partial_tree_cache = PartialTreeCachDict()
                         self._init_partial_tree_cache()
-                    else:
-                        assert self.state.orthogonality_center_id == self.update_path[0]   
+                    assert self.state.orthogonality_center_id == self.update_path[0]   
                 ##########
 
                 self.run_one_time_step_ex() 
-                state_ex = deepcopy(self.state) 
-            ttn = deepcopy(self.state)
-            ttn = original_form(ttn , self.two_neighbour_form_dict)
-            I = TTNO.Identity(ttn)
-            I_ex = ttn.operator_expectation_value_Lindblad(I)
-            if np.abs(np.abs(I_ex) - 1)  > self.norm_tol :
-                self.state = normalize_ttn_Lindblad(ttn) 
-                norm = self.state.operator_expectation_value_Lindblad(I)
-            else:
-                self.state = ttn  
-                norm = I_ex                 
+            
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
-                current_results = self.evaluate_operators() / norm
+
+                current_results = self.evaluate_operators()
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size  
-            max_two_neighbour_form(self.state , self.two_neighbour_form_dict)
 
-            state_bond = deepcopy(self.state)
-            self.record_bond_dimensions()
-            
-            self._orthogonalize_init()
-            self.partial_tree_cache = PartialTreeCachDict()
-            self._init_partial_tree_cache()                 
+            self.record_bond_dimensions()           
+              
         
         if evaluation_time == "inf":
             current_results = self.evaluate_operators()

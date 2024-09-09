@@ -35,7 +35,7 @@ class OneSiteTDVP(TDVPAlgorithm):
                  expansion_steps: int = 10,
                  initial_tol: float = 1e-5,
                  final_tol: float = 1e-10,
-                 tol_step: float = 1e-1, 
+                 tol_step: float = 1, 
                  max_bond: int = 32,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                
                  config: Union[TTNTimeEvolutionConfig,None] = None) -> None:
