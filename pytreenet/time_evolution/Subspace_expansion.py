@@ -1,6 +1,8 @@
 import numpy as np
 from copy import deepcopy
 from typing import Tuple, Any, Dict, List
+from scipy.sparse.linalg import eigsh
+
 
 from ..util.tensor_splitting import (SplitMode , truncated_tensor_svd)
 from ..ttns import TreeTensorNetworkState
@@ -19,7 +21,7 @@ def Krylov_basis(ttn: TreeTensorNetworkState,
                  ttno: TTNO, 
                  num_vecs: int, 
                  tau: float, 
-                 SVDParameters : SVDParameters = SVDParameters()):
+                 SVDParameters : SVDParameters):
    ttn_copy = deepcopy(ttn)
    ttno_copy = deepcopy(ttno)
 
@@ -45,14 +47,13 @@ def Krylov_basis(ttn: TreeTensorNetworkState,
 
 
 class KrylovBasisMode(Enum):
-
     apply_ham = "apply_ham"
     apply_1st_order_expansion = "apply_1st_order_expansion"
 
 def Krylov_basis2(ttn: TreeTensorNetworkState, 
                  ttno: TTNO, 
                  num_vecs: int, 
-                 SVDParameters : SVDParameters = SVDParameters()):
+                 SVDParameters : SVDParameters):
     ttn_copy = deepcopy(ttn)
     ttno_copy = deepcopy(ttno)
     ttn_structure = deepcopy(ttn_copy)
@@ -69,14 +70,18 @@ def Krylov_basis2(ttn: TreeTensorNetworkState,
         basis_list.append(ttn_copy)
     return basis_list
 
-
 def expand_subspace(ttn: TreeTensorNetworkState, 
                     ttno: TTNO,
                     num_vecs: int,
                     tau: float,
-                    SVDParameters : SVDParameters = SVDParameters(),
-                    tol = 1e-04,
-                    mode: KrylovBasisMode = KrylovBasisMode.apply_ham):
+                    SVDParameters : SVDParameters,
+                    tol,
+                    Lanczos_threshold: int, 
+                    k_fraction: float, 
+                    validity_fraction: float, 
+                    increase_fraction: float, 
+                    max_iter: int,
+                    mode: KrylovBasisMode ):
     #ttno = adjust_ttno_structure_to_ttn(ttno , ttn)
     #ttn , dict1 = max_two_neighbour_form(ttn)
     #ttno , dict2 = max_two_neighbour_form(ttno , dict1) 
@@ -88,18 +93,17 @@ def expand_subspace(ttn: TreeTensorNetworkState,
 
     ttn_copy = deepcopy(basis[0])
     for i in range(len(basis)-1):
-        ttn_copy = enlarge_ttn1_bond_with_ttn2(ttn_copy, basis[i+1], tol)
+        ttn_copy = enlarge_ttn1_bond_with_ttn2_Lanczos(ttn_copy, basis[i+1], tol, Lanczos_threshold , k_fraction, validity_fraction, increase_fraction, max_iter)
         #ttn_copy.normalize_ttn()
     #ttn_copy = original_form(ttn_copy , dict1)    
     return ttn_copy
 
-
-def enlarge_ttn1_bond_with_ttn2(ttn1, ttn2, tol):
+def enlarge_ttn1_bond_with_ttn2_Lanczos(ttn1, ttn2, tol, Lanczos_threshold , k_fraction, validity_fraction, increase_fraction, max_iter):
    ttn1_copy = deepcopy(ttn1)
    ttn3 = deepcopy(ttn1)
    path_main = TDVPUpdatePathFinder(ttn1_copy).find_path()
    path_next = find_tdvp_orthogonalization_path(ttn1_copy,path_main) 
-   
+
    for i,node_id in enumerate(path_main[:-1]): 
         next_node_id = path_next[i][0]
 
@@ -109,7 +113,7 @@ def enlarge_ttn1_bond_with_ttn2(ttn1, ttn2, tol):
         pho_B = compute_transfer_tensor(ttn2.tensors[node_id],(index,))
         pho = pho_A + pho_B
 
-        v = compute_v(pho, index, tol)
+        v = compute_v_Lanczos(pho, index, tol, Lanczos_threshold , k_fraction, validity_fraction, increase_fraction, max_iter)
 
         ttn3.tensors[node_id] = v
         ttn3.nodes[node_id].link_tensor(v)
@@ -147,11 +151,11 @@ def enlarge_ttn1_bond_with_ttn2(ttn1, ttn2, tol):
 
    return ttn3
 
-def compute_v(pho, index , tol):
+def compute_v_Lanczos(pho, index, tol, Lanczos_threshold , k_fraction, validity_fraction, increase_fraction, max_iter):
     shape = pho.shape
     shape_prime = (np.prod(shape[:len(shape)//2]),) + (np.prod(shape[len(shape)//2:]),)
     pho = pho.reshape(shape_prime)
-    v = eig(pho , tol)
+    v = eig_Lanczos(pho, tol, Lanczos_threshold , k_fraction, validity_fraction, increase_fraction, max_iter)
     v = v.T
     v = v.reshape( (v.shape[0],) + shape[len(shape)//2:])
 
@@ -161,15 +165,108 @@ def compute_v(pho, index , tol):
     v = v.transpose(perm)
     return v
 
-def eig(pho , tol):
+
+
+def eig_Lanczos(pho, tol, Lanczos_threshold , k_fraction, validity_fraction, increase_fraction, max_iter):
+    """
+    Compute eigenvectors of a matrix 'pho' corresponding to eigenvalues whose magnitudes
+    exceed a given tolerance 'tol', using the Lanczos method with dynamic adjustments to 
+    the number of eigenvectors computed in each iteration.
+
+    Parameters:
+    - pho (ndarray): The input matrix (should be symmetric). This represents a square matrix 
+                     for which we want to compute the eigenvectors.
+    - tol (float): The tolerance threshold for filtering eigenvalues by magnitude. Eigenvalues 
+                   whose magnitudes are below this threshold will be ignored.
+    - Lanczos_threshold (int): The minimum size of the matrix for the Lanczos method to be applied. If 
+                            the matrix size is smaller than this threshold, the function will return 
+                            an empty result.               
+    - k_fraction (float): The fraction of the matrix size to determine the initial number 
+                                of eigenvectors to compute. For example, a value of 0.6 means 
+                                that the initial computation will use 60% of the total matrix size.
+    - validity_fraction (float): The fraction of the initially computed eigenvectors that need to 
+                                 exceed the tolerance in order to terminate the computation early.
+                                 For example, 0.8 means number of significant eigenvectors must be
+                                 less than 80% of the k
+    - increase_fraction (float): The fraction of the matrix size by which the number of eigenvectors 
+                                 will be increased in each iteration if the desired fraction of 
+                                 significant eigenvalues is not reached.
+    - max_iter (int): The maximum number of iterations to attempt increasing the number of eigenvectors.
+
+    Returns:
+    - v (ndarray): The matrix of eigenvectors corresponding to eigenvalues whose magnitudes exceed the 
+                   tolerance. The size of this matrix will vary based on the number of significant 
+                   eigenvalues.
+    """
+    
+    # Check if the matrix 'pho' has a sufficient number of rows/columns
+    if pho.shape[0] > Lanczos_threshold:
+        
+        # Determine the initial number of eigenvectors to compute
+        k = int(pho.shape[0] * k_fraction) + 1
+
+        # Iterate to increase k and recompute eigenvectors
+        for iter_count in range(max_iter):
+            k = min(k, pho.shape[0])  # Ensure k does not exceed the matrix size
+            #print(f"Iteration {iter_count}: k = {k}")
+
+            # Compute eigenvalues and eigenvectors using the Lanczos method
+            w, v = eigsh(pho, k=k, which='LM', tol=tol)
+
+            # Compute the magnitudes of the eigenvalues and sort them
+            magnitudes = np.abs(w)
+            sorted_indices = np.argsort(magnitudes)[::-1]
+
+            # Sort the eigenvalues and eigenvectors in descending order of magnitude
+            w = w[sorted_indices]
+            v = v[:, sorted_indices]
+
+            # Find indices of eigenvalues that are significant (above tolerance)
+            valid_indices = np.where(magnitudes > tol)[0]
+            #print(f"Number of valid eigenvectors: {len(valid_indices)}")
+
+            # If no significant eigenvalues are found, return the first eigenvector
+            if len(valid_indices) == 0:
+                v = np.reshape(v[:, 1], (v.shape[0], 1))
+                print(f"len(valid_indices) = 0")
+                return v
+            
+            # If a sufficient fraction of significant eigenvalues is found, return them
+            if len(valid_indices) < int(k * validity_fraction) or k == pho.shape[0]:
+                v = v[:, valid_indices]
+                #print(f"2 Eigenvectors corresponding to significant eigenvalues: {v.shape}")
+                return v
+            
+            # Increase k for the next iteration
+            k += int(pho.shape[0] * increase_fraction)
+
+        # If the loop completes, return the most recent set of eigenvectors
+        # print(f"3 Eigenvectors corresponding to significant eigenvalues: {v.shape}")    
+        return v
+    else:
+        return eig(pho, tol)
+
+
+def eig(pho, tol):
+    # Check if pho is an empty matrix
+    #print(f"pho matrix shape: {pho.shape}")
+        
     w, v = np.linalg.eig(pho)
+        
     magnitudes = np.abs(w)
     sorted_indices = np.argsort(magnitudes)[::-1]
+        
     w = w[sorted_indices]
     v = v[:, sorted_indices]
+    
     k = np.sum(magnitudes > tol)
+    #print(f"Significant eigenvalues (magnitude > tol): {k}")
+    
     v = v[:, :k]
+    #print(f"Eigenvectors : {v.shape}")
     return v
+
+
 
 
 def absorb_matrix_into_tensor(A, B, axes):

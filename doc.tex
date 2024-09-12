@@ -1,0 +1,102 @@
+### Complete Explanation of the Lanczos-Based Eigenvalue Computation Function for Documentation
+
+#### Purpose
+The function `eig1_lanczos_symmetric` is designed to compute the eigenvectors corresponding to eigenvalues of a matrix `pho` that are larger than a specified tolerance `tol`. This function is particularly suited for **large, symmetric matrices**, where computing all eigenvalues and eigenvectors using standard methods (like `np.linalg.eig`) would be inefficient and time-consuming.
+
+#### Why We Use the Lanczos Method
+For large matrices, using standard dense matrix solvers like `np.linalg.eig` becomes impractical because:
+1. **Memory Usage**: Dense eigenvalue solvers compute all eigenvalues and eigenvectors, which requires significant memory when dealing with large matrices.
+2. **Time Complexity**: The computational complexity of computing all eigenvalues scales poorly (on the order of \(O(n^3)\)), making it inefficient for large matrices.
+
+The **Lanczos algorithm**, implemented in `scipy.sparse.linalg.eigsh` for symmetric matrices, allows for the efficient computation of only the most significant eigenvalues (those with the largest magnitudes). This method works by iteratively approximating the eigenvalues, making it feasible to compute eigenvalues for large, sparse matrices.
+
+#### Challenges with Lanczos
+1. **Approximations**: Unlike `np.linalg.eig`, which computes exact eigenvalues and eigenvectors, the Lanczos method is iterative and approximates the largest eigenvalues. This can lead to differences in results when compared to exact solvers.
+   
+2. **Fixed Number of Eigenvalues (`k`)**: The Lanczos method requires specifying `k`, the number of eigenvalues to compute, upfront. If `k` is too small, it might miss some important eigenvalues. If `k` is too large, the method becomes inefficient.
+
+3. **Tolerance Management**: The algorithm needs to compute eigenvalues that exceed a user-specified tolerance (`tol`). However, determining how many eigenvalues to compute before hitting this threshold is challenging since `eigs` or `eigsh` doesn’t dynamically adjust the number of computed eigenvalues based on a tolerance.
+
+#### How the Trick Works: Adaptive Eigenvalue Computation
+To handle these challenges, we use an **adaptive strategy** that progressively increases the number of eigenvalues (`k`) computed until all eigenvalues larger than `tol` are captured. Here’s how the function works:
+
+1. **Initial Parameters**:
+   - We start by computing a relatively small number of eigenvalues (`k_initial`) with the Lanczos method, using `eigsh` (optimized for symmetric matrices).
+   - If the number of eigenvalues larger than the specified tolerance is less than `k`, we increase `k` by `k_step` and repeat the computation.
+
+2. **Iterative Refinement**:
+   - We compute the `k` largest eigenvalues and eigenvectors in each iteration.
+   - After each computation, we filter the eigenvalues whose magnitudes exceed the tolerance (`tol`).
+   - If the number of eigenvalues exceeding `tol` is sufficient (i.e., less than or equal to `k`), or if we’ve reached the matrix size limit, we stop and return the corresponding eigenvectors.
+   
+3. **Stopping Criteria**:
+   - If further increasing `k` doesn’t yield more significant eigenvalues (those above the tolerance), we stop. This prevents unnecessary computations.
+   - We also limit `k` to the matrix size, so we don’t request more eigenvalues than the matrix can provide.
+
+#### Code Walkthrough
+
+```python
+import numpy as np
+from scipy.sparse.linalg import eigsh
+
+def eig1_lanczos_symmetric(pho, tol, k_initial=10, k_step=5, max_iter=100):
+    """
+    Compute eigenvectors of matrix 'pho' corresponding to eigenvalues 
+    whose magnitudes exceed a given tolerance 'tol' using the Lanczos method.
+
+    Parameters:
+    - pho (ndarray): The input matrix (should be symmetric).
+    - tol (float): The tolerance threshold for filtering eigenvalues by magnitude.
+    - k_initial (int): The initial number of eigenvalues to compute.
+    - k_step (int): The step size for increasing the number of eigenvalues.
+    - max_iter (int): The maximum number of iterations for increasing k.
+
+    Returns:
+    - v (ndarray): The matrix of eigenvectors corresponding to eigenvalues 
+                   whose magnitudes exceed the tolerance.
+    """
+    k = k_initial  # Start with an initial guess for k
+    pho_size = pho.shape[0]  # Get the size of the matrix
+
+    for i in range(max_iter):
+        if k > pho_size:  # Ensure k doesn't exceed the matrix size
+            k = pho_size
+        
+        # Compute k largest eigenvalues and eigenvectors using eigsh for symmetric matrices
+        w, v = eigsh(pho, k=k, which='LM', tol=tol)
+        
+        # Sort eigenvalues by magnitude (largest first)
+        magnitudes = np.abs(w)
+        sorted_indices = np.argsort(magnitudes)[::-1]
+        w = w[sorted_indices]
+        v = v[:, sorted_indices]
+        
+        # Find eigenvalues whose magnitude is greater than the tolerance
+        valid_indices = np.where(magnitudes > tol)[0]
+        
+        # If we have enough eigenvalues, return the corresponding eigenvectors
+        if len(valid_indices) < k or k == pho_size:
+            v = v[:, valid_indices]
+            return v
+        
+        # If not enough eigenvalues exceed tol, increase k and repeat
+        k += k_step
+    
+    # Return whatever we've computed if we hit max iterations
+    return v
+```
+
+#### Explanation of Key Parameters:
+- **`pho`**: The input matrix. It must be symmetric for `eigsh` to work efficiently.
+- **`tol`**: The tolerance threshold. Eigenvalues with magnitudes smaller than `tol` are discarded.
+- **`k_initial`**: The initial guess for the number of largest eigenvalues to compute. A small value saves computation time but may not capture enough eigenvalues.
+- **`k_step`**: The step by which we increase `k` in each iteration to compute more eigenvalues if necessary.
+- **`max_iter`**: The maximum number of iterations. If the function doesn't converge within this number of iterations, it returns whatever has been computed so far.
+
+#### Function Behavior:
+1. **Efficiency**: For large matrices, this function efficiently computes only the significant eigenvalues and eigenvectors, saving memory and computational cost.
+2. **Adaptive**: By starting with a small number of eigenvalues and increasing it iteratively, we avoid unnecessarily large computations while ensuring we capture all eigenvalues above the tolerance.
+3. **Symmetry Exploitation**: The function leverages the fact that `pho` is symmetric (or Hermitian) by using `eigsh`, which is optimized for this case and provides more accurate results for large matrices than `eigs`.
+
+#### Conclusion
+This function is highly efficient for large symmetric matrices and adaptively computes the eigenvectors associated with eigenvalues above a specified tolerance. By combining the Lanczos method with iterative refinement of `k`, it provides a balance between accuracy and performance, making it suitable for large-scale computations.

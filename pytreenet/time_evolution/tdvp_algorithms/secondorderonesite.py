@@ -32,16 +32,24 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             the backwards run.
     """
 
-    def __init__(self, initial_state: TreeTensorNetworkState,
-                 hamiltonian: TTNO, time_step_size: float, final_time: float,
+    def __init__(self, 
+                 initial_state: TreeTensorNetworkState,
+                 hamiltonian: TTNO, 
+                 time_step_size: float, 
+                 final_time: float,
                  operators: Union[TensorProduct, List[TensorProduct]],
                  num_vecs: int = 3, 
                  tau: float = 1e-2, 
                  SVDParameters : SVDParameters = SVDParameters(),
-                 expansion_steps: int = 10,
+                 expansion_steps: int = 10,   
+                 Lanczos_threshold : float = 10,
+                 k_fraction : float = 0.6, 
+                 validity_fraction : float = 0.8, 
+                 increase_fraction : float = 0.3, 
+                 max_iter : int = 10,                         
                  initial_tol: float = 1e-20,
-                 final_tol: float = 1e-50,
                  tol_step: float = 1, 
+                 rel_max_bond : int = 5,
                  max_bond: int = 32, 
                  norm_tol: float = np.inf,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                  
@@ -66,11 +74,16 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          SVDParameters,
                          expansion_steps,
                          initial_tol,
-                         final_tol,
                          tol_step,
+                         rel_max_bond,
                          max_bond,
                          KrylovBasisMode,  
                          config)
+        self.Lanczos_threshold = Lanczos_threshold
+        self.k_fraction = k_fraction
+        self.validity_fraction = validity_fraction
+        self.increase_fraction = increase_fraction
+        self.max_iter = max_iter
         self.norm_tol = norm_tol
         self.backwards_update_path = self._init_second_order_update_path()
         self.backwards_orth_path = self._init_second_order_orth_path()
@@ -269,30 +282,50 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 the path to that file can be specified here. Defaults to "".
             pgbar (bool, optional): Toggles the progress bar. Defaults to True.
         """
-
+        should_expand = True
         self._init_results(evaluation_time)
         assert self._results is not None
-        tol_step = -1
-        for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
+        tol = self.initial_tol
+        for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar): 
             if i != 0:  # We also measure the initial expectation_values   
-
                 ###########
-                if i % self.expansion_steps == 0 and self.state.max_bond_dim() < self.max_bond :
-                    tol_step += 1
+                if i % self.expansion_steps == 0 and should_expand:                    
+                    state_ex = expand_subspace(self.state, 
+                                               self.hamiltonian, 
+                                               self.num_vecs, 
+                                               self.tau, 
+                                               self.SVDParameters, 
+                                               tol, 
+                                               self.Lanczos_threshold, 
+                                               self.k_fraction, 
+                                               self.validity_fraction, 
+                                               self.increase_fraction,
+                                               self.max_iter,
+                                               self.KrylovBasisMode)
+                    
+                    if  self.max_bond < state_ex.max_bond_dim():
+                        print("max_bond_dim exceeds max_bond :" , state_ex.max_bond_dim())
+                        should_expand = False
+                        continue
+                
+                    before_max_bond = self.state.max_bond_dim()
+                    self.state = state_ex
+                    self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
+                    self.partial_tree_cache = PartialTreeCachDict()
+                    self._init_partial_tree_cache()
+                    after_max_bond = self.state.max_bond_dim()
+                    
+                    print(before_max_bond , "--->" , after_max_bond , "tol : " , tol)
 
-                    tol = self.initial_tol * self.tol_step ** tol_step
-                    if tol > self.final_tol:
-                        tol = self.final_tol
-                    state_ex = expand_subspace(self.state, self.hamiltonian, 
-                                                self.num_vecs, self.tau, 
-                                                self.SVDParameters, tol, self.KrylovBasisMode)
-                    if state_ex.max_bond_dim() < self.max_bond:
-                        self.state = state_ex
-                        self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
-                        self.partial_tree_cache = PartialTreeCachDict()
-                        self._init_partial_tree_cache()
-                    assert self.state.orthogonality_center_id == self.update_path[0]   
-                ##########
+                    if after_max_bond - before_max_bond > self.rel_max_bond:
+                        # Increase tol by tol_step
+                        tol *= self.tol_step
+                    elif after_max_bond == before_max_bond :
+                         # Decrease tol by 1/tol_step
+                         tol /= self.tol_step
+                    else:
+                        pass     
+
 
                 self.run_one_time_step_ex() 
             
@@ -312,4 +345,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             self._results[0:-1, 0] = current_results
             self._results[-1, 0] = i*self.time_step_size
         if filepath != "":
-            self.save_results_to_file(filepath)        #   
+            self.save_results_to_file(filepath) 
+            
+            
+                            
