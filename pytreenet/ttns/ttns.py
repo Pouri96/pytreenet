@@ -187,7 +187,7 @@ def normalize_ttn_Lindblad(ttn) :
         ttn_normalized.nodes[ket_id].link_tensor(T)
 
         T = ttn_normalized.tensors[bra_id].astype(complex)
-        T /= norm.conj()
+        T /= norm
         ttn_normalized.tensors[bra_id] = T
         ttn_normalized.nodes[bra_id].link_tensor(T)
 

@@ -37,6 +37,7 @@ def Krylov_basis(ttn: TreeTensorNetworkState,
 
    basis_list = [ttn_copy]
    for _ in range(num_vecs):
+      ttno_copy = adjust_ttno_structure_to_ttn(ttno_copy,ttn_copy)
       ttn_copy = contract_ttno_with_ttn(ttno_copy,ttn_copy)
       ttn_structure = deepcopy(ttn_copy)
       ttn_copy.canonical_form(TDVPUpdatePathFinder(ttn_copy).find_path()[0] , SVDParameters)  
@@ -499,31 +500,41 @@ def direct_sum_ttn1_with_ttn2(ttn1 , ttn2):
     return ttn3 
 
 def max_two_neighbour_form(ttn , node_order = None): 
-    nodes = deepcopy(ttn.nodes)
+    state = deepcopy(ttn)
+    nodes = deepcopy(state.nodes)
     dict = {}
     for node_id in nodes:
-        node = ttn.nodes[node_id]
+        node = state.nodes[node_id]
+        
+        if node_order is None:
+            node_order = random_order_generator(state)
+
         if node.nneighbours() > 2:
-            if node_order is not None:
-                neighbour_id = node_order[node_id]
-            else:    
-                neighbour_id = node.children[0]
-            q_legs, r_legs = build_qr_leg_specs2(node, neighbour_id)
-            ttn.split_node_qr(node_id, q_legs, r_legs,
-                q_identifier= "Q_" + node_id,
-                r_identifier=node_id,
-                mode=SplitMode.REDUCED)
-            shape = ttn.tensors["Q_" + node_id].shape
-            if isinstance(ttn , TreeTensorNetworkState):
-                T = ttn.tensors["Q_" + node_id].reshape(shape + (1,))
-                ttn.tensors["Q_" + node_id] = T 
-                ttn.nodes["Q_" + node_id].link_tensor(T)
-            elif isinstance(ttn , TTNO):    
-                T = ttn.tensors["Q_" + node_id].reshape(shape + (1,1))
-                ttn.tensors["Q_" + node_id] = T 
-                ttn.nodes["Q_" + node_id].link_tensor(T)
+            neighbour_id = node_order[node_id]
+            u_legs, v_legs = build_qr_leg_specs2(node, neighbour_id)
+            state.split_node_svd(node_id, u_legs, v_legs,
+                u_identifier= "Q_" + node_id,
+                v_identifier=node_id,
+                svd_params = SVDParameters(max_bond_dim= np.inf, rel_tol= -np.inf, total_tol= -np.inf),
+                contr_mode = ContractionMode.VCONTR)
+            shape = state.tensors["Q_" + node_id].shape
+            if isinstance(state , TreeTensorNetworkState):
+                T = state.tensors["Q_" + node_id].reshape(shape + (1,))
+                state.tensors["Q_" + node_id] = T 
+                state.nodes["Q_" + node_id].link_tensor(T)
+            elif isinstance(state , TTNO):    
+                T = state.tensors["Q_" + node_id].reshape(shape + (1,1))
+                state.tensors["Q_" + node_id] = T 
+                state.nodes["Q_" + node_id].link_tensor(T)
             dict[node_id] = neighbour_id
-    return ttn , dict
+    return state , dict
+
+def random_order_generator(ttn):
+    dict = {}
+    for node in ttn.nodes.values():
+        if node.nneighbours() > 2 :
+           dict[node.identifier] = np.random.choice(node.children) 
+    return dict
 
 def original_form(state, dict):
     ttn = deepcopy(state)

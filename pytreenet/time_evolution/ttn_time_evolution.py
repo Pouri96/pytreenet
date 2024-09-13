@@ -142,7 +142,38 @@ class TTNTimeEvolution(TimeEvolution):
         #self.record_bond_dimensions()
         return current_results
 
+
     def evaluate_operator(self, operator: Union[TensorProduct,TTNO]) -> complex:
+        """
+        Evaluate the expectation value of a single operator.
+
+        Args:
+            operator (TensorProduct): The operator for which to compute the
+                expectation value.
+        
+        Returns:
+            np.ndarray: The expectation value of the operator with respect to
+                the current state.
+        """
+        if self.Lindblad_mode:
+        #    ttn = deepcopy(self.state)
+        #    ttno = deepcopy(operator)
+        #    ttn = original_form(ttn , self.two_neighbour_form_dict)
+        #    op_state = contract_ttno_with_ttn( ttno, ttn)
+        #    return contract_ttn_Lindblad(op_state)  
+        #   
+            ttn = deepcopy(self.state)
+            # ttn = original_form(ttn , self.two_neighbour_form_dict)
+            # ttn = normalize_ttn_Lindblad(ttn)
+            ttno = deepcopy(operator)  
+            return ttn.operator_expectation_value_Lindblad(ttno)
+        else:  
+            ttn = deepcopy(self.state)
+            ttno = deepcopy(operator)
+            ttn = original_form(ttn , self.two_neighbour_form_dict)
+            return ttn.operator_expectation_value(ttno)   
+
+#    def evaluate_operator(self, operator: Union[TensorProduct,TTNO]) -> complex:
         """
         Evaluate the expectation value of a single operator.
 

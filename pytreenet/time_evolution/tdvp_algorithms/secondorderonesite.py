@@ -85,27 +85,23 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self.increase_fraction = increase_fraction
         self.max_iter = max_iter
         self.norm_tol = norm_tol
-        self.backwards_update_path = self._init_second_order_update_path()
-        self.backwards_orth_path = self._init_second_order_orth_path()
-        self.state , self.hamiltonian = self._init_two_neighbour_form()
 
     def _init_two_neighbour_form(self):
         """
         Transform the state and the Hamiltonian into the max two neighbour form.
         """
-        # adjust_operator_to_ket(self.hamiltonian , self.state)
         self.hamiltonian = adjust_ttno_structure_to_ttn(self.hamiltonian , self.state)
         self.state , dict1 = max_two_neighbour_form(self.state)
-        self.hamiltonian , dict2 = max_two_neighbour_form(self.hamiltonian , dict1)
-        #self.hamiltonian = adjust_ttno_structure_to_ttn(tdvp_ex1.hamiltonian , tdvp_ex1.state)
-        assert dict1 == dict2
-        self.partial_tree_cache = PartialTreeCachDict()
-        self._init_partial_tree_cache()
+        self.hamiltonian , _ = max_two_neighbour_form(self.hamiltonian , dict1)
+        self.hamiltonian = adjust_ttno_structure_to_ttn(self.hamiltonian , self.state)
         self.update_path = TDVPUpdatePathFinder(self.state).find_path()
         self.orthogonalization_path = self._find_tdvp_orthogonalization_path(self.update_path) 
         self.backwards_update_path = self._init_second_order_update_path()
         self.backwards_orth_path = self._init_second_order_orth_path() 
         self.two_neighbour_form_dict = dict1
+        self._orthogonalize_init()
+        self.partial_tree_cache = PartialTreeCachDict()
+        self._init_partial_tree_cache()
         return self.state , self.hamiltonian
     
     def _init_second_order_update_path(self) -> List[str]:
@@ -286,66 +282,131 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self._init_results(evaluation_time)
         assert self._results is not None
         tol = self.initial_tol
-        for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar): 
-            if i != 0:  # We also measure the initial expectation_values   
-                ###########
-                if i % self.expansion_steps == 0 and should_expand:                    
-                    state_ex = expand_subspace(self.state, 
-                                               self.hamiltonian, 
-                                               self.num_vecs, 
-                                               self.tau, 
-                                               self.SVDParameters, 
-                                               tol, 
-                                               self.Lanczos_threshold, 
-                                               self.k_fraction, 
-                                               self.validity_fraction, 
-                                               self.increase_fraction,
-                                               self.max_iter,
-                                               self.KrylovBasisMode)
-                    
-                    if  self.max_bond < state_ex.max_bond_dim():
-                        print("max_bond_dim exceeds max_bond :" , state_ex.max_bond_dim())
-                        should_expand = False
-                        continue
-                
-                    before_max_bond = self.state.max_bond_dim()
-                    self.state = state_ex
-                    self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
-                    self.partial_tree_cache = PartialTreeCachDict()
-                    self._init_partial_tree_cache()
-                    after_max_bond = self.state.max_bond_dim()
-                    
-                    print(before_max_bond , "--->" , after_max_bond , "tol : " , tol)
+        prev_max_bond = self.state.max_bond_dim()
+        prev_expanded_dim = self.rel_max_bond - 1 
 
-                    if after_max_bond - before_max_bond > self.rel_max_bond:
-                        # Increase tol by tol_step
-                        tol *= self.tol_step
-                    elif after_max_bond == before_max_bond :
-                         # Decrease tol by 1/tol_step
-                         tol /= self.tol_step
-                    else:
-                        pass     
-
-
-                self.run_one_time_step_ex() 
+        for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
             
+            print("___________________")
+            before_norm_max_bond = self.state.max_bond_dim()  
+            
+
+            ttn = deepcopy(self.state)
+            I = TTNO.Identity(ttn)
+            I_ex = ttn.operator_expectation_value_Lindblad(I)
+            if np.abs(np.abs(I_ex) - 1)  > self.norm_tol:
+                self.state = normalize_ttn_Lindblad(ttn) 
+                norm = self.state.operator_expectation_value_Lindblad(I)
+            else:
+                self.state = ttn  
+                norm = I_ex 
+   
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
-
-                current_results = self.evaluate_operators()
+                current_results = self.evaluate_operators() / norm
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size  
 
-            self.record_bond_dimensions()           
-              
-        
+
+            ########### T3NS ###########
+            self.state , self.hamiltonian = self._init_two_neighbour_form() 
+            ############################
+            
+            after_norm_max_bond = self.state.max_bond_dim()
+            
+
+            self.run_one_time_step_ex() 
+
+            ########### EXAPNSION ###########
+            if (i+1) % (self.expansion_steps+1) == 0 and should_expand:  
+               
+                print("tol :" , tol)               
+                state_ex = expand_subspace(self.state, 
+                                            self.hamiltonian, 
+                                            self.num_vecs, 
+                                            self.tau, 
+                                            self.SVDParameters, 
+                                            tol, 
+                                            self.Lanczos_threshold, 
+                                            self.k_fraction, 
+                                            self.validity_fraction, 
+                                            self.increase_fraction,
+                                            self.max_iter,
+                                            self.KrylovBasisMode)
+                
+                if  self.max_bond < state_ex.max_bond_dim():
+                    print("max_bond_dim exceeds max_bond :" , state_ex.max_bond_dim())
+                    A = True
+
+                    for _ in range(2):
+                        tol *= self.tol_step
+                        if A:
+                            state_ex_prime = expand_subspace(self.state, 
+                                                            self.hamiltonian, 
+                                                            self.num_vecs, 
+                                                            self.tau, 
+                                                            self.SVDParameters, 
+                                                            tol, 
+                                                            self.Lanczos_threshold, 
+                                                            self.k_fraction, 
+                                                            self.validity_fraction, 
+                                                            self.increase_fraction,
+                                                            self.max_iter,
+                                                            self.KrylovBasisMode)
+                            if  self.max_bond > state_ex_prime.max_bond_dim():
+                                state_ex = state_ex_prime
+                                should_expand = False
+                                A = False
+                                print("1) tol" , tol)
+                          
+                    if self.max_bond < state_ex.max_bond_dim():
+                        print(self.max_bond , state_ex.max_bond_dim()) 
+                        state_ex = deepcopy(self.state)
+                        should_expand = False
+                        print("3")
+                        
+                self.state = state_ex
+                self._orthogonalize_init()
+                #self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
+                self.partial_tree_cache = PartialTreeCachDict()
+                self._init_partial_tree_cache() 
+                after_ex_max_bond = self.state.max_bond_dim()
+                
+                print("expansion :" , after_norm_max_bond , "--->" , after_ex_max_bond)
+                       
+            ##################################
+                 
+            #self.record_bond_dimensions()
+            self.state = original_form(self.state , self.two_neighbour_form_dict)
+            self.hamiltonian = original_form(self.hamiltonian ,self.two_neighbour_form_dict)
+            
+            after_cont_max_bond = self.state.max_bond_dim()
+            print("TTN :" , before_norm_max_bond , "--->" , "T3NS :" , after_norm_max_bond , "TTN :" , after_cont_max_bond)
+
+            if (i+1) % (self.expansion_steps+1) == 0 :
+                prev_expanded_dim = after_cont_max_bond - before_norm_max_bond
+                print("expanded_dim :" , prev_expanded_dim)
+                if prev_expanded_dim > self.rel_max_bond:
+                        # Increase tol by tol_step
+                        tol *= self.tol_step
+                elif prev_expanded_dim == 0:
+                        # Decrease tol by 1/tol_step
+                            tol /= self.tol_step   
+                   
+            print("___________________")
+    
         if evaluation_time == "inf":
             current_results = self.evaluate_operators()
             self._results[0:-1, 0] = current_results
             self._results[-1, 0] = i*self.time_step_size
         if filepath != "":
-            self.save_results_to_file(filepath) 
-            
-            
-                            
+            self.save_results_to_file(filepath)               
+
+
+
+
+
+
+
+                       
