@@ -174,9 +174,8 @@ def normalize_ttn_Lindblad2(ttn) :
 def normalize_ttn_Lindblad(ttn) : 
     ttn_normalized = copy_object(ttn, deep = True)
     I = TTNO.Identity(ttn_normalized)
-    for ket_id in list(ttn.nodes.keys())[0:len(ttn.nodes)//2]:
-        i, j = ket_id.replace('Site(', '').replace(')', '').split(',')
-        bra_id = f"Node({i},{j})"
+    for ket_id in [node.identifier for node in ttn.nodes.values() if str(node.identifier).startswith("S")]:
+        bra_id = ket_id.replace('Site', 'Node')
 
         norm = ttn_normalized.operator_expectation_value_Lindblad(I)
         norm = np.sqrt(norm)

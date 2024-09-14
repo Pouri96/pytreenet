@@ -177,10 +177,9 @@ def transpose_node_with_neighbouring_nodes(state, ket_id, neighbours):
         state.nodes[ket_id].children = neighbours[1:]    
 
 def adjust_operator_to_ket(operator,state):
-    for ket_id in list(state.nodes.keys())[0:len(state.nodes)//2]:
+    for ket_id in [node.identifier for node in state.nodes.values() if str(node.identifier).startswith("S")]:
         if operator.nodes[ket_id].is_root():
-            i, j = ket_id.replace('Site(', '').replace(')', '').split(',')
-            bra_id = f"Node({i},{j})"
+            bra_id = ket_id.replace("Site", "Node")
 
             perm = list(range(state.tensors[ket_id].ndim - 1))
             n = state.nodes[ket_id].neighbour_index(bra_id)
@@ -211,10 +210,9 @@ def convert_sites_and_nodes(input_list):
     return converted_list
 
 def adjust_bra_to_ket(state):
-    for ket_id in list(state.nodes.keys())[0:len(state.nodes)//2]:
+    for ket_id in [node.identifier for node in state.nodes.values() if str(node.identifier).startswith("S")]:
         if state.nodes[ket_id].is_root():
-            i, j = ket_id.replace('Site(', '').replace(')', '').split(',')
-            bra_id = f"Node({i},{j})"
+            bra_id = ket_id.replace("Site", "Node")
 
             perm = list(range(state.tensors[ket_id].ndim - 1))
             n = state.nodes[ket_id].neighbour_index(bra_id)
@@ -226,8 +224,7 @@ def adjust_bra_to_ket(state):
             neighbours = convert_sites_and_nodes(neighbours)
             transpose_node_with_neighbouring_nodes(state, bra_id, neighbours)
         else:
-            i, j = ket_id.replace('Site(', '').replace(')', '').split(',')
-            bra_id = f"Node({i},{j})"                
+            bra_id = ket_id.replace("Site", "Node")               
             neighbours = state.nodes[ket_id].neighbouring_nodes()
             neighbours = convert_sites_and_nodes(neighbours)
             transpose_node_with_neighbouring_nodes(state, bra_id, neighbours) 

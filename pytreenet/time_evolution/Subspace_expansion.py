@@ -513,23 +513,35 @@ def max_two_neighbour_form(ttn , node_order = None):
             neighbour_id = node_order[node_id]
             u_legs, v_legs = build_qr_leg_specs2(node, neighbour_id)
             state.split_node_svd(node_id, u_legs, v_legs,
-                u_identifier= "Q_" + node_id,
+                u_identifier=  node_id + "_u",
                 v_identifier=node_id,
                 svd_params = SVDParameters(max_bond_dim= np.inf, rel_tol= -np.inf, total_tol= -np.inf),
                 contr_mode = ContractionMode.VCONTR)
-            shape = state.tensors["Q_" + node_id].shape
+            shape = state.tensors[ node_id + "_u"].shape
             if isinstance(state , TreeTensorNetworkState):
-                T = state.tensors["Q_" + node_id].reshape(shape + (1,))
-                state.tensors["Q_" + node_id] = T 
-                state.nodes["Q_" + node_id].link_tensor(T)
+                T = state.tensors[ node_id + "_u"].reshape(shape + (1,))
+                state.tensors[ node_id + "_u"] = T 
+                state.nodes[ node_id + "_u"].link_tensor(T)
             elif isinstance(state , TTNO):    
-                T = state.tensors["Q_" + node_id].reshape(shape + (1,1))
-                state.tensors["Q_" + node_id] = T 
-                state.nodes["Q_" + node_id].link_tensor(T)
+                T = state.tensors[ node_id + "_u"].reshape(shape + (1,1))
+                state.tensors[ node_id + "_u"] = T 
+                state.nodes[ node_id + "_u"].link_tensor(T)
             dict[node_id] = neighbour_id
     return state , dict
 
 def random_order_generator(ttn):
+    exclude_element = "Node(0,0)"
+    result_dict = {}
+    for ket_node in [node for node in ttn.nodes.values() if str(node.identifier).startswith("S")]:
+        if ket_node.nneighbours() > 2:
+            # Filter out the specific element from ket_node.children
+            filtered_children = [child for child in ket_node.children if child != exclude_element and child.startswith('S')]
+            if filtered_children:  # Ensure there are still children left to choose from
+                result_dict[ket_node.identifier] = np.random.choice(filtered_children)
+                result_dict[ket_node.identifier.replace("Site", "Node")] = result_dict[ket_node.identifier].replace("Site", "Node")
+    return result_dict
+
+def random_order_generator2(ttn):
     exclude_element = "Node(0,0)"
     result_dict = {}
     for node in ttn.nodes.values():
@@ -544,12 +556,12 @@ def original_form(state, dict):
     ttn = deepcopy(state)
     for node_id in dict:
         if isinstance(ttn , TreeTensorNetworkState):
-           T = ttn.tensors["Q_"+node_id].reshape(ttn.tensors["Q_"+node_id].shape[:-1]) 
+           T = ttn.tensors[node_id + "_u"].reshape(ttn.tensors[node_id + "_u"].shape[:-1]) 
         elif isinstance(ttn , TTNO):
-           T = ttn.tensors["Q_"+node_id].reshape(ttn.tensors["Q_"+node_id].shape[:-2])   
-        ttn.tensors["Q_"+node_id] = T
-        ttn.nodes["Q_"+node_id].link_tensor(T)
-        ttn.contract_nodes("Q_"+node_id, node_id, node_id)
+           T = ttn.tensors[node_id + "_u"].reshape(ttn.tensors[node_id + "_u"].shape[:-2])   
+        ttn.tensors[node_id + "_u"] = T
+        ttn.nodes[node_id + "_u"].link_tensor(T)
+        ttn.contract_nodes(node_id + "_u", node_id, node_id)
     return ttn
 
 def build_qr_leg_specs2(node ,

@@ -41,7 +41,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                  num_vecs: int = 3, 
                  tau: float = 1e-2, 
                  SVDParameters : SVDParameters = SVDParameters(),
-                 expansion_steps: int = 10,   
+                 expansion_steps: int = 10,
                  Lanczos_threshold : float = 10,
                  k_fraction : float = 0.6, 
                  validity_fraction : float = 0.8, 
@@ -51,7 +51,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                  tol_step: float = 1, 
                  rel_max_bond : int = 5,
                  max_bond: int = 32, 
-                 norm_tol: float = np.inf,
+                 norm_tol: float = 0,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                  
                  config: Union[TTNTimeEvolutionConfig,None] = None) -> None:
         """
@@ -85,14 +85,21 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self.increase_fraction = increase_fraction
         self.max_iter = max_iter
         self.norm_tol = norm_tol
+        self._init_two_neighbour_form() 
 
     def _init_two_neighbour_form(self):
         """
-        Transform the state and the Hamiltonian into the max two neighbour form.
+        Transform the state, Hamiltonian and operators into the max two neighbour form.
         """
         self.hamiltonian = adjust_ttno_structure_to_ttn(self.hamiltonian , self.state)
         self.state , dict1 = max_two_neighbour_form(self.state)
         self.hamiltonian , _ = max_two_neighbour_form(self.hamiltonian , dict1)
+        list = []
+        for operators in self.operators: 
+            operator , _ = max_two_neighbour_form(operators,dict1)
+            list.append(operator)
+        self.operators = list
+
         self.hamiltonian = adjust_ttno_structure_to_ttn(self.hamiltonian , self.state)
         self.update_path = TDVPUpdatePathFinder(self.state).find_path()
         self.orthogonalization_path = self._find_tdvp_orthogonalization_path(self.update_path) 
@@ -102,7 +109,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self._orthogonalize_init()
         self.partial_tree_cache = PartialTreeCachDict()
         self._init_partial_tree_cache()
-        return self.state , self.hamiltonian
+        
     
     def _init_second_order_update_path(self) -> List[str]:
         """
@@ -282,14 +289,11 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self._init_results(evaluation_time)
         assert self._results is not None
         tol = self.initial_tol
-        prev_max_bond = self.state.max_bond_dim()
-        prev_expanded_dim = self.rel_max_bond - 1 
 
         for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
             
             print("___________________")
-            before_norm_max_bond = self.state.max_bond_dim()  
-            
+            before_norm_max_bond = self.state.max_bond_dim()           
 
             ttn = deepcopy(self.state)
             I = TTNO.Identity(ttn)
@@ -300,25 +304,20 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             else:
                 self.state = ttn  
                 norm = I_ex 
-   
+       
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
                 current_results = self.evaluate_operators() / norm
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size  
-
-
-            ########### T3NS ###########
-            self.state , self.hamiltonian = self._init_two_neighbour_form() 
-            ############################
-            
-            after_norm_max_bond = self.state.max_bond_dim()
-            
+            print("N :" , self.evaluate_operators()[1] / norm)
 
             self.run_one_time_step_ex() 
 
             ########### EXAPNSION ###########
+            before_ex_max_bond = self.state.max_bond_dim()
+
             if (i+1) % (self.expansion_steps+1) == 0 and should_expand:  
                
                 print("tol :" , tol)               
@@ -373,26 +372,21 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 self._init_partial_tree_cache() 
                 after_ex_max_bond = self.state.max_bond_dim()
                 
-                print("expansion :" , after_norm_max_bond , "--->" , after_ex_max_bond)
-                       
-            ##################################
-                 
-            #self.record_bond_dimensions()
-            self.state = original_form(self.state , self.two_neighbour_form_dict)
-            self.hamiltonian = original_form(self.hamiltonian ,self.two_neighbour_form_dict)
-            
-            after_cont_max_bond = self.state.max_bond_dim()
-            print("TTN :" , before_norm_max_bond , "--->" , "T3NS :" , after_norm_max_bond , "TTN :" , after_cont_max_bond)
-
-            if (i+1) % (self.expansion_steps+1) == 0 :
-                prev_expanded_dim = after_cont_max_bond - before_norm_max_bond
-                print("expanded_dim :" , prev_expanded_dim)
-                if prev_expanded_dim > self.rel_max_bond:
+                expanded_dim = after_ex_max_bond - before_ex_max_bond
+                if expanded_dim > self.rel_max_bond:
                         # Increase tol by tol_step
                         tol *= self.tol_step
-                elif prev_expanded_dim == 0:
+                elif expanded_dim == 0:
                         # Decrease tol by 1/tol_step
-                            tol /= self.tol_step   
+                            tol /= self.tol_step
+
+                print("expansion :" , before_ex_max_bond , "--->" , after_ex_max_bond)
+       
+            ##################################
+                 
+            self.record_bond_dimensions()
+        
+ 
                    
             print("___________________")
     
