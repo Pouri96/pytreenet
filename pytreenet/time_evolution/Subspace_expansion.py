@@ -530,11 +530,15 @@ def max_two_neighbour_form(ttn , node_order = None):
     return state , dict
 
 def random_order_generator(ttn):
-    dict = {}
+    exclude_element = "Node(0,0)"
+    result_dict = {}
     for node in ttn.nodes.values():
-        if node.nneighbours() > 2 :
-           dict[node.identifier] = np.random.choice(node.children) 
-    return dict
+        if node.nneighbours() > 2:
+            # Filter out the specific element from node.children
+            filtered_children = [child for child in node.children if child != exclude_element]
+            if filtered_children:  # Ensure there are still children left to choose from
+                result_dict[node.identifier] = np.random.choice(filtered_children)
+    return result_dict
 
 def original_form(state, dict):
     ttn = deepcopy(state)
