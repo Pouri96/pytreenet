@@ -338,9 +338,10 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                     print("max_bond_dim exceeds max_bond :" , state_ex.max_bond_dim())
                     A = True
 
-                    for _ in range(2):
-                        tol *= self.tol_step
+                    for _ in range(3):
                         if A:
+                            tol *= self.tol_step
+                            print("1) tol" , tol)                            
                             state_ex_prime = expand_subspace(self.state, 
                                                             self.hamiltonian, 
                                                             self.num_vecs, 
@@ -354,10 +355,10 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                                                             self.max_iter,
                                                             self.KrylovBasisMode)
                             if  self.max_bond > state_ex_prime.max_bond_dim():
-                                state_ex = state_ex_prime
-                                should_expand = False
+                                state_ex = state_ex_prime         
                                 A = False
-                                print("1) tol" , tol)
+                                print(state_ex.max_bond_dim())
+
                           
                     if self.max_bond < state_ex.max_bond_dim():
                         print(self.max_bond , state_ex.max_bond_dim()) 
@@ -371,14 +372,20 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 self.partial_tree_cache = PartialTreeCachDict()
                 self._init_partial_tree_cache() 
                 after_ex_max_bond = self.state.max_bond_dim()
-                
+             
                 expanded_dim = after_ex_max_bond - before_ex_max_bond
+
                 if expanded_dim > self.rel_max_bond:
                         # Increase tol by tol_step
                         tol *= self.tol_step
                 elif expanded_dim == 0:
                         # Decrease tol by 1/tol_step
                             tol /= self.tol_step
+
+                if self.max_bond < after_ex_max_bond:
+                    print("END :" , after_ex_max_bond)
+                    should_expand = False
+                    break      
 
                 print("expansion :" , before_ex_max_bond , "--->" , after_ex_max_bond)
        
