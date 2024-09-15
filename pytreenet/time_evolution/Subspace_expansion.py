@@ -202,7 +202,7 @@ def eig_Lanczos(pho, tol, Lanczos_threshold , k_fraction, validity_fraction, inc
     
     # Check if the matrix 'pho' has a sufficient number of rows/columns
     if pho.shape[0] > Lanczos_threshold:
-        
+        print("Lanczos method" , pho.shape[0])
         # Determine the initial number of eigenvectors to compute
         k = int(pho.shape[0] * k_fraction) + 1
 
@@ -210,7 +210,7 @@ def eig_Lanczos(pho, tol, Lanczos_threshold , k_fraction, validity_fraction, inc
         for iter_count in range(max_iter):
             k = min(k, pho.shape[0])  # Ensure k does not exceed the matrix size
             #print(f"Iteration {iter_count}: k = {k}")
-
+            
             # Compute eigenvalues and eigenvectors using the Lanczos method
             w, v = eigsh(pho, k=k, which='LM', tol=tol)
 
@@ -221,6 +221,8 @@ def eig_Lanczos(pho, tol, Lanczos_threshold , k_fraction, validity_fraction, inc
             # Sort the eigenvalues and eigenvectors in descending order of magnitude
             w = w[sorted_indices]
             v = v[:, sorted_indices]
+            
+            print("v.shape" , v.shape)
 
             # Find indices of eigenvalues that are significant (above tolerance)
             valid_indices = np.where(magnitudes > tol)[0]
@@ -238,8 +240,10 @@ def eig_Lanczos(pho, tol, Lanczos_threshold , k_fraction, validity_fraction, inc
                 #print(f"2 Eigenvectors corresponding to significant eigenvalues: {v.shape}")
                 return v
             
+            
             # Increase k for the next iteration
             k += int(pho.shape[0] * increase_fraction)
+            
 
         # If the loop completes, return the most recent set of eigenvectors
         # print(f"3 Eigenvectors corresponding to significant eigenvalues: {v.shape}")    

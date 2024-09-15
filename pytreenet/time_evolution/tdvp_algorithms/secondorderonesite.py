@@ -49,7 +49,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                  max_iter : int = 10,                         
                  initial_tol: float = 1e-20,
                  tol_step: float = 1, 
-                 rel_max_bond : int = 5,
+                 rel_tot_bond : int = 5,
                  max_bond: int = 32, 
                  norm_tol: float = 0,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                  
@@ -75,7 +75,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          expansion_steps,
                          initial_tol,
                          tol_step,
-                         rel_max_bond,
+                         rel_tot_bond,
                          max_bond,
                          KrylovBasisMode,  
                          config)
@@ -293,7 +293,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
             
             print("___________________")
-            before_norm_max_bond = self.state.max_bond_dim()           
+            before_norm_max_bond = self.state.total_bond_dim()           
 
             ttn = deepcopy(self.state)
             I = TTNO.Identity(ttn)
@@ -316,6 +316,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             self.run_one_time_step_ex() 
 
             ########### EXAPNSION ###########
+            before_ex_total_bond = self.state.total_bond_dim()
             before_ex_max_bond = self.state.max_bond_dim()
 
             if (i+1) % (self.expansion_steps+1) == 0 and should_expand:  
@@ -334,11 +335,12 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                                             self.max_iter,
                                             self.KrylovBasisMode)
                 
-                if  self.max_bond < state_ex.max_bond_dim():
-                    print("max_bond_dim exceeds max_bond :" , state_ex.max_bond_dim())
+                expanded_dim_tot = state_ex.total_bond_dim() - self.state.total_bond_dim()
+                if  expanded_dim_tot > self.rel_tot_bond:
+                    print("expanded_dim_tot :" , expanded_dim_tot)
                     A = True
 
-                    for _ in range(10):
+                    for _ in range(4):
                         if A:
                             tol *= self.tol_step
                             print("1) tol" , tol)                            
@@ -354,14 +356,14 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                                                             self.increase_fraction,
                                                             self.max_iter,
                                                             self.KrylovBasisMode)
-                            if  self.max_bond > state_ex_prime.max_bond_dim():
+                            
+                            expanded_dim_tot = state_ex_prime.total_bond_dim() - self.state.total_bond_dim()
+                            if  expanded_dim_tot < self.rel_tot_bond :
                                 state_ex = state_ex_prime         
                                 A = False
-                                print(state_ex.max_bond_dim())
-
                           
-                    if self.max_bond < state_ex.max_bond_dim():
-                        print(self.max_bond , state_ex.max_bond_dim()) 
+                    if self.max_bond < state_ex.total_bond_dim():
+                        print(self.max_bond , state_ex.total_bond_dim()) 
                         state_ex = deepcopy(self.state)
                         should_expand = False
                         print("3")
@@ -371,24 +373,28 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 #self.state.move_orthogonalization_center(self.update_path[0],mode = SplitMode.KEEP)
                 self.partial_tree_cache = PartialTreeCachDict()
                 self._init_partial_tree_cache() 
-                after_ex_max_bond = self.state.max_bond_dim()
-             
-                expanded_dim = after_ex_max_bond - before_ex_max_bond
+                after_ex_total_bond = self.state.total_bond_dim()
+                afte_ex_max_bond = self.state.max_bond_dim()
 
-                if expanded_dim > self.rel_max_bond:
+                expanded_dim_max_bond = afte_ex_max_bond - before_ex_max_bond
+                expanded_dim_total_bond = after_ex_total_bond - before_ex_total_bond
+
+                if expanded_dim_total_bond > self.rel_tot_bond:
                         # Increase tol by tol_step
                         tol *= self.tol_step
-                elif expanded_dim == 0:
+                elif expanded_dim_total_bond <= 0 :
                         # Decrease tol by 1/tol_step
                             tol /= self.tol_step
 
-                if self.max_bond < after_ex_max_bond:
-                    print("END :" , after_ex_max_bond)
+                if self.max_bond < after_ex_total_bond:
+                    print("END :" , after_ex_total_bond)
                     should_expand = False
                     break      
-
-                print("expansion :" , before_ex_max_bond , "--->" , after_ex_max_bond)
-       
+             
+                print("expansion_max:" , before_ex_max_bond , "--->" , afte_ex_max_bond)
+                print("expanded_dim :" , expanded_dim_total_bond)      
+                print("expanded_dim :" , before_ex_total_bond , "--->" , after_ex_total_bond)       
+ 
             ##################################
                  
             self.record_bond_dimensions()

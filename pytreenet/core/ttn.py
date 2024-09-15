@@ -394,6 +394,9 @@ class TreeTensorNetwork(TreeStructure):
             neighbour_id = node.parent
         return node.shape[node.neighbour_index(neighbour_id)]
 
+    def total_bond_dim(self):
+        return sum(self.bond_dims().values())
+
     def max_bond_dim(self) -> int:
         """
         Find the maximum virtual bond dimension in this TTN.
