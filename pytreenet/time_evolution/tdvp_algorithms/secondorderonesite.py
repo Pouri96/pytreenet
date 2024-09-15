@@ -338,7 +338,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                     print("max_bond_dim exceeds max_bond :" , state_ex.max_bond_dim())
                     A = True
 
-                    for _ in range(3):
+                    for _ in range(10):
                         if A:
                             tol *= self.tol_step
                             print("1) tol" , tol)                            
