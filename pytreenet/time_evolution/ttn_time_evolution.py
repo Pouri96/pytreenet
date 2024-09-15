@@ -64,8 +64,12 @@ class TTNTimeEvolution(TimeEvolution):
 
         if config is not None and config.record_bond_dim:
             self.bond_dims = {}
+            self.max_bond_dim = []
+            self.total_bond_dim = []
         else:
             self.bond_dims = None
+            self.max_bond_dim = None
+            self.total_bond_dim = None
 
         if config.Lindblad:
             self.Lindblad = True    
@@ -100,9 +104,13 @@ class TTNTimeEvolution(TimeEvolution):
         if self.records_bond_dim:
             if len(self.bond_dims) == 0:
                 self.bond_dims = {key: [value] for key, value in self.obtain_bond_dims().items()}
+                self.max_bond_dim = [self.state.max_bond_dim()]
+                self.total_bond_dim = [self.state.total_bond_dim()]
             else:
                 for key, value in self.obtain_bond_dims().items():
                     self.bond_dims[key].append(value)
+                self.max_bond_dim.append(self.state.max_bond_dim())
+                self.total_bond_dim.append(self.state.total_bond_dim())
 
     def operator_result(self,
                         operator_id: str | int,

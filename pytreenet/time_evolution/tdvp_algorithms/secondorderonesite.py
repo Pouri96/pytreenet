@@ -293,7 +293,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
             
             print("___________________")
-            before_norm_max_bond = self.state.total_bond_dim()           
+                    
 
             ttn = deepcopy(self.state)
             I = TTNO.Identity(ttn)
@@ -359,7 +359,9 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                             
                             expanded_dim_tot = state_ex_prime.total_bond_dim() - self.state.total_bond_dim()
                             if  expanded_dim_tot < self.rel_tot_bond :
-                                state_ex = state_ex_prime         
+                                state_ex = state_ex_prime   
+                                print("dim_tot :" , state_ex_prime.total_bond_dim())
+
                                 A = False
                           
                     if self.max_bond < state_ex.total_bond_dim():
