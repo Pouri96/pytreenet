@@ -291,9 +291,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         tol = self.initial_tol
 
         for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
-            
-            print("___________________")
-                    
+                                
 
             ttn = deepcopy(self.state)
             I = TTNO.Identity(ttn)
@@ -322,7 +320,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if (i+1) % (self.expansion_steps+1) == 0 and should_expand:  
                
                 print("tol :" , tol)               
-                state_ex = expand_subspace(self.state, 
+                state_ex = expand_subspace(ttn, 
                                             self.hamiltonian, 
                                             self.num_vecs, 
                                             self.tau, 
@@ -344,7 +342,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                         if A:
                             tol *= self.tol_step
                             print("1) tol" , tol)                            
-                            state_ex_prime = expand_subspace(self.state, 
+                            state_ex_prime = expand_subspace(ttn, 
                                                             self.hamiltonian, 
                                                             self.num_vecs, 
                                                             self.tau, 
@@ -402,9 +400,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             self.record_bond_dimensions()
         
  
-                   
-            print("___________________")
-    
+                
         if evaluation_time == "inf":
             current_results = self.evaluate_operators()
             self._results[0:-1, 0] = current_results
