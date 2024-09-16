@@ -388,8 +388,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
 
                 if self.max_bond < after_ex_total_bond:
                     print("END :" , after_ex_total_bond)
-                    should_expand = False
-                    break      
+                    should_expand = False      
              
                 print("expansion_max:" , before_ex_max_bond , "--->" , afte_ex_max_bond)
                 print("expanded_dim :" , expanded_dim_total_bond)      
