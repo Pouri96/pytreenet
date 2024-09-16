@@ -309,7 +309,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size  
-            print("N :" , self.evaluate_operators()[1] / norm)
+            # print("N :" , self.evaluate_operators()[1] / norm)
 
             self.run_one_time_step_ex() 
 
@@ -320,7 +320,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if (i+1) % (self.expansion_steps+1) == 0 and should_expand:  
                
                 print("tol :" , tol)               
-                state_ex = expand_subspace(ttn, 
+                state_ex = expand_subspace(self.state, 
                                             self.hamiltonian, 
                                             self.num_vecs, 
                                             self.tau, 
@@ -342,7 +342,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                         if A:
                             tol *= self.tol_step
                             print("1) tol" , tol)                            
-                            state_ex_prime = expand_subspace(ttn, 
+                            state_ex_prime = expand_subspace(self.state, 
                                                             self.hamiltonian, 
                                                             self.num_vecs, 
                                                             self.tau, 
