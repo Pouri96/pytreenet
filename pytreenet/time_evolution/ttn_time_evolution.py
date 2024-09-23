@@ -9,7 +9,7 @@ from .time_evolution import TimeEvolution
 from ..ttns import TreeTensorNetworkState
 from ..ttno import TTNO
 from ..operators.tensorproduct import TensorProduct
-from ..ttns.ttns import normalize_ttn_Lindblad
+# from ..ttns.ttns import normalize_ttn_Lindblad
 from pytreenet.time_evolution.Subspace_expansion import contract_ttno_with_ttn
 from pytreenet.contractions.state_state_contraction import contract_ttn_Lindblad 
 from pytreenet.time_evolution.Subspace_expansion import original_form
@@ -25,6 +25,7 @@ class TTNTimeEvolutionConfig:
     """
     record_bond_dim: bool = False
     Lindblad: bool = False
+    T3NS: bool = False
 
 class TTNTimeEvolution(TimeEvolution):
     """
@@ -70,6 +71,11 @@ class TTNTimeEvolution(TimeEvolution):
             self.bond_dims = None
             self.max_bond_dim = None
             self.total_bond_dim = None
+        
+        if config.T3NS:
+           self.T3NS = True
+        else:
+           self.T3NS = False
 
         if config.Lindblad:
             self.Lindblad = True    

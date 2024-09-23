@@ -174,7 +174,7 @@ def transpose_node_with_neighbouring_nodes(state, ket_id, neighbours):
     if state.nodes[ket_id].is_root():
         state.nodes[ket_id].children = neighbours
     else:
-        state.nodes[ket_id].children = neighbours[1:]    
+        state.nodes[ket_id].children = neighbours[1:]  
 
 def adjust_operator_to_ket(operator,state):
     for ket_id in [node.identifier for node in state.nodes.values() if str(node.identifier).startswith("S")]:

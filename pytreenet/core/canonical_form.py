@@ -47,6 +47,7 @@ def canonical_form(ttn: TreeTensorNetwork,
             node = ttn.nodes[node_id]
             minimum_distance_neighbour_id = _find_smallest_distance_neighbour(node,
                                                                               distance_dict)
+            
             if isinstance(mode,SplitMode):  
                 split_qr_contract_r_to_neighbour(ttn,
                                              node_id,
@@ -59,6 +60,51 @@ def canonical_form(ttn: TreeTensorNetwork,
                                                   SVDParameters = mode,
                                                   contr_mode = contr_mode)
     ttn.orthogonality_center_id = orthogonality_center_id
+
+
+def canonical_form_twosite(ttn: TreeTensorNetwork,
+                   orthogonality_center_1: str,
+                   orthogonality_center_2: str,
+                   mode: SplitMode = SplitMode.REDUCED,
+                   contr_mode: ContractionMode = ContractionMode.VCONTR):
+    """
+    Modifies a TreeTensorNetwork into canonical form.
+
+    Args:
+        ttn (TreeTensorNetwork): The TTN for which to be transformed into
+            canonical form.
+        orthogonality_center_id (str): The identifier of the tensor node which
+            is the orthogonality center for the canonical form.
+        mode: The mode to be used for the QR decomposition. For details refe
+            to `tensor_util.tensor_qr_decomposition`.
+    """
+    distance_dict = ttn.distance_to_node(
+        orthogonality_center_1)
+    maximum_distance = max(distance_dict.values())
+    # Perform QR-decomposition on all TensorNodes but the orthogonality center
+    for distance in reversed(range(1, maximum_distance+1)):
+        # Perform QR on nodes furthest away first.
+        node_id_with_distance = [node_id for node_id in distance_dict.keys()
+                                 if distance_dict[node_id] == distance]
+        for node_id in node_id_with_distance:
+            if node_id == orthogonality_center_2:
+               continue        
+            node = ttn.nodes[node_id]
+            minimum_distance_neighbour_id = _find_smallest_distance_neighbour(node,
+                                                                              distance_dict)
+            
+            if isinstance(mode,SplitMode):  
+                split_qr_contract_r_to_neighbour(ttn,
+                                             node_id,
+                                             minimum_distance_neighbour_id,
+                                             mode=mode)
+            elif isinstance(mode,SVDParameters):
+                split_svd_contract_sv_to_neighbour(ttn = ttn,
+                                                  node_id = node_id,
+                                                  neighbour_id = minimum_distance_neighbour_id,
+                                                  SVDParameters = mode,
+                                                  contr_mode = contr_mode)
+
 
 def adjust_ttn1_structure_to_ttn2(ttn1, ttn2):
     """
@@ -86,24 +132,23 @@ def adjust_ttn1_structure_to_ttn2(ttn1, ttn2):
     return ttn3    
 
 def adjust_ttno_structure_to_ttn(ttno, ttn):
-    ttno2 = deepcopy(ttno)
+    ttno_copy = deepcopy(ttno)
 
-    for node_id in ttno2.nodes:
-        node_id = "Site(0,0)"
+    for node_id in ttno_copy.nodes:
         ttno_neighbours = ttno.nodes[node_id].neighbouring_nodes()
         element_map = {elem: i for i, elem in enumerate(ttno_neighbours)}
         ttn1_neighbours = ttn.nodes[node_id].neighbouring_nodes()
         permutation = tuple(element_map[elem] for elem in ttn1_neighbours)
         nneighbours = ttn.nodes[node_id].nneighbours()
         ttno_tensor = ttno.tensors[node_id].transpose(permutation + (nneighbours,) + (nneighbours + 1,))
-        ttno2.tensors[node_id] = ttno_tensor
-        ttno2.nodes[node_id].link_tensor(ttno_tensor)
+        ttno_copy.tensors[node_id] = ttno_tensor
+        ttno_copy.nodes[node_id].link_tensor(ttno_tensor)
         ttn_neighbours = ttn.nodes[node_id].neighbouring_nodes()
-        if ttno2.nodes[node_id].is_root():
-            ttno2.nodes[node_id].children = ttn_neighbours
+        if ttno_copy.nodes[node_id].is_root():
+            ttno_copy.nodes[node_id].children = ttn_neighbours
         else:
-            ttno2.nodes[node_id].children = ttn_neighbours[1:] 
-    return ttno2       
+            ttno_copy.nodes[node_id].children = ttn_neighbours[1:] 
+    return ttno_copy       
 
 def _find_smallest_distance_neighbour(node: Node,
                                       distance_dict: dict[str, int]) -> str:
