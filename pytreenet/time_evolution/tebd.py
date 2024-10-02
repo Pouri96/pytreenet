@@ -108,10 +108,10 @@ class TEBD(TTNTimeEvolution):
         self.state.contract_nodes(identifiers[0], identifiers[1],
                            new_identifier="contr")
         self.state.absorb_into_open_legs("contr", operator)
-        self.state.split_node_svd("contr", u_legs, v_legs,
+        self.state.split_node_svd("contr", svd_params=self.svd_parameters,
+                                  u_legs = u_legs, v_legs = v_legs,
                                   u_identifier=identifiers[0],
-                                  v_identifier=identifiers[1],
-                                  svd_params=self.svd_parameters)
+                                  v_identifier=identifiers[1])
 
     def _apply_one_trotter_step(self, unitary: NumericOperator):
         """

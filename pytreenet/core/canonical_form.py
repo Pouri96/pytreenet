@@ -214,8 +214,9 @@ def split_svd_contract_sv_to_neighbour(ttn: TreeTensorNetwork,
     node = ttn.nodes[node_id]
     u_legs, v_legs = _build_qr_leg_specs(node, neighbour_id)
     r_tensor_id = str(uuid1()) # Avoid identifier duplication
-    ttn.split_node_svd(node_id , u_legs, v_legs,
-                       svd_params = SVDParameters,
+    ttn.split_node_svd(node_id , svd_params = SVDParameters,
+                        u_legs = u_legs,
+                        v_legs = v_legs,
                        u_identifier = node_id, v_identifier = r_tensor_id,
                        contr_mode = contr_mode)
     ttn.contract_nodes(neighbour_id, r_tensor_id,

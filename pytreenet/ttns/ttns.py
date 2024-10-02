@@ -152,22 +152,8 @@ def normalize_ttn(ttn: TreeTensorNetworkState , to_copy = False):
    return ttn_normalized 
 
 
-def normalize_ttn_Lindblad_4(ttn , orth_center_id): 
-    ttn_normalized = copy_object(ttn, deep = True)
-    adjust_bra_to_ket(ttn_normalized)
-    ttn_normalized.canonical_form(orth_center_id, mode = SplitMode.REDUCED) 
- 
-    I = TTNO.Identity(ttn_normalized)
-    norm = ttn_normalized.operator_expectation_value_Lindblad(I)
 
-    T = ttn_normalized.tensors[orth_center_id].astype(complex)
-    T /= norm
-    ttn_normalized.tensors[orth_center_id] = T
-    ttn_normalized.nodes[orth_center_id].link_tensor(T)
-    return ttn_normalized
-
-
-def normalize_ttn_Lindblad_3(ttn , orth_center_id_1 , orth_center_id_2 ): 
+def normalize_ttn_Lindblad_3_conj(ttn , orth_center_id_1 , orth_center_id_2 ): 
     
     ttn_normalized = copy_object(ttn, deep = True)
     adjust_bra_to_ket(ttn_normalized)
@@ -185,6 +171,46 @@ def normalize_ttn_Lindblad_3(ttn , orth_center_id_1 , orth_center_id_2 ):
     T /= norm.conj()
     ttn_normalized.tensors[orth_center_id_2] = T
     ttn_normalized.nodes[orth_center_id_2].link_tensor(T)
+    return ttn_normalized
+
+def normalize_ttn_Lindblad_3(ttn , orth_center_id_1 , orth_center_id_2 ): 
+    
+    ttn_normalized = copy_object(ttn, deep = True)
+    adjust_bra_to_ket(ttn_normalized)
+    ttn_normalized.canonical_form_twosite(orth_center_id_1, orth_center_id_2 , mode = SplitMode.REDUCED)    
+    I = TTNO.Identity(ttn_normalized)
+    norm = ttn_normalized.operator_expectation_value_Lindblad(I)
+    norm = np.sqrt(norm)
+
+    T = ttn_normalized.tensors[orth_center_id_1].astype(complex)
+    T /= norm
+    ttn_normalized.tensors[orth_center_id_1] = T
+    ttn_normalized.nodes[orth_center_id_1].link_tensor(T)
+
+    T = ttn_normalized.tensors[orth_center_id_2].astype(complex)
+    T /= norm
+    ttn_normalized.tensors[orth_center_id_2] = T
+    ttn_normalized.nodes[orth_center_id_2].link_tensor(T)
+    return ttn_normalized
+
+def normalize_ttn_Lindblad_1_conj(ttn) : 
+    ttn_normalized = copy_object(ttn, deep = True)
+    I = TTNO.Identity(ttn_normalized)
+    norm = ttn_normalized.operator_expectation_value_Lindblad(I)
+    n = len(ttn.nodes) // 2
+    norm = np.sqrt(norm ** (1/n))
+    for ket_id in [node.identifier for node in ttn.nodes.values() if str(node.identifier).startswith("S")]:
+        bra_id = ket_id.replace('Site', 'Node')
+        T = ttn_normalized.tensors[ket_id].astype(complex)
+        T /= norm
+        ttn_normalized.tensors[ket_id] = T
+        ttn_normalized.nodes[ket_id].link_tensor(T)
+
+        T = ttn_normalized.tensors[bra_id].astype(complex)
+        T /= norm.conj()
+        ttn_normalized.tensors[bra_id] = T
+        ttn_normalized.nodes[bra_id].link_tensor(T)
+
     return ttn_normalized
 
 def normalize_ttn_Lindblad_1(ttn) : 
@@ -207,14 +233,29 @@ def normalize_ttn_Lindblad_1(ttn) :
 
     return ttn_normalized
 
-def normalize_ttn_Lindblad_2(ttn) : 
+
+def normalize_ttn_Lindblad_4(ttn , orth_center_id): 
+    ttn_normalized = copy_object(ttn, deep = True)
+    adjust_bra_to_ket(ttn_normalized)
+    ttn_normalized.canonical_form(orth_center_id, mode = SplitMode.REDUCED) 
+ 
+    I = TTNO.Identity(ttn_normalized)
+    norm = ttn_normalized.operator_expectation_value_Lindblad(I)
+
+    T = ttn_normalized.tensors[orth_center_id].astype(complex)
+    T /= norm
+    ttn_normalized.tensors[orth_center_id] = T
+    ttn_normalized.nodes[orth_center_id].link_tensor(T)
+    return ttn_normalized
+
+
+def normalize_ttn_Lindblad_5_conj(ttn) : 
     ttn_normalized = copy_object(ttn, deep = True)
     I = TTNO.Identity(ttn_normalized)
+
     for ket_id in [node.identifier for node in ttn.nodes.values() if str(node.identifier).startswith("S")]:
         bra_id = ket_id.replace('Site', 'Node')
-
-        norm = ttn_normalized.operator_expectation_value_Lindblad(I)
-        norm = np.sqrt(norm)
+        norm = np.sqrt(ttn_normalized.operator_expectation_value_Lindblad(I))
 
         T = ttn_normalized.tensors[ket_id].astype(complex)
         T /= norm
@@ -224,8 +265,21 @@ def normalize_ttn_Lindblad_2(ttn) :
         T = ttn_normalized.tensors[bra_id].astype(complex)
         T /= norm.conj()
         ttn_normalized.tensors[bra_id] = T
-        ttn_normalized.nodes[bra_id].link_tensor(T)
+        ttn_normalized.nodes[bra_id].link_tensor(T)        
+
+    return ttn_normalized
+
+def normalize_ttn_Lindblad_5(ttn) : 
+    ttn_normalized = copy_object(ttn, deep = True)
+    I = TTNO.Identity(ttn_normalized)
+    for node_id in list(ttn.nodes.keys()):
+        norm = ttn_normalized.operator_expectation_value_Lindblad(I)
+        T = ttn_normalized.tensors[node_id].astype(complex)
+        T /= norm
+        ttn_normalized.tensors[node_id] = T
+        ttn_normalized.nodes[node_id].link_tensor(T)
 
     return ttn_normalized
 
 TTNS = TreeTensorNetworkState
+

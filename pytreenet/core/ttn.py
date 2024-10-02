@@ -919,10 +919,9 @@ class TreeTensorNetwork(TreeStructure):
                          in_identifier=r_identifier,
                          mode=mode)
 
-    def split_node_svd(self, node_id: str,
+    def split_node_svd(self, node_id: str,svd_params: SVDParameters,
                        u_legs: LegSpecification, v_legs: LegSpecification,
                        u_identifier: str = "", v_identifier: str = "",
-                       svd_params: SVDParameters = SVDParameters(),
                        contr_mode: ContractionMode = ContractionMode.VCONTR):
         """
         Splits a node in two using singular value decomposition.

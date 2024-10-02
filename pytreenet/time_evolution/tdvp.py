@@ -11,7 +11,7 @@ from .tdvp_algorithms import (TDVPAlgorithm,
 from .ttn_time_evolution import TTNTimeEvolutionConfig
 from ..operators.tensorproduct import TensorProduct
 from ..ttns import TreeTensorNetworkState
-from ..ttno.ttno import TTNO
+from ..ttno.ttno_class import TTNO
 from ..util.tensor_splitting import SVDParameters
 
 class TDVPConfig:
@@ -34,15 +34,12 @@ class TDVPConfig:
     def __init__(self,
                  order: int = 2,
                  sites: int = 1,
-                 svd_params: Union[SVDParameters,None] = None,
+                 svd_params: SVDParameters = None,
                  time_evo_config: Union[TTNTimeEvolutionConfig,None] = None):
 
         self.order = order
         self.sites = sites
-        if svd_params is None:
-            self.svd_params = SVDParameters()
-        else:
-            self.svd_params = svd_params
+        self.svd_params = svd_params
         if time_evo_config is None:
             self.time_evo_config = TTNTimeEvolutionConfig()
         else:

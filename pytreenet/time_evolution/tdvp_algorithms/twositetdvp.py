@@ -11,7 +11,7 @@ from .tdvp_algorithm import TDVPAlgorithm
 from ..ttn_time_evolution import TTNTimeEvolutionConfig
 from ..time_evolution import time_evolve
 from ...ttns.ttns import TreeTensorNetworkState
-from ...ttno.ttno import TTNO
+from ...ttno.ttno_class import TTNO
 from ...operators.tensorproduct import TensorProduct
 from ...util.tensor_splitting import SVDParameters
 from ...util.tensor_util import tensor_matricisation_half
@@ -265,10 +265,10 @@ class TwoSiteTDVP(TDVPAlgorithm):
                                         forward=True)
         self.state.tensors[new_id] = updated_two_sites
         # Split the two-site tensor using SVD
-        self.state.split_node_svd(new_id, u_legs, v_legs,
+        self.state.split_node_svd(new_id, svd_params=self.svd_parameters,
+                                  u_legs = u_legs , v_legs = v_legs,
                                   u_identifier=target_node_id,
-                                  v_identifier=next_node_id,
-                                  svd_params=self.svd_parameters)
+                                  v_identifier=next_node_id)
         self.state.orthogonality_center_id = next_node_id
         self.update_tree_cache(target_node_id, next_node_id)
 

@@ -18,7 +18,7 @@ from ...util.ttn_exceptions import NoConnectionException
 from ...contractions.state_operator_contraction import contract_any
 from ...util.tensor_splitting import (SplitMode,SVDParameters)
 from ...operators.tensorproduct import TensorProduct
-from ...ttno.ttno import TTNO
+from ...ttno.ttno_class import TTNO
 from ...ttns import TreeTensorNetworkState
 from ..ttn_time_evolution import TTNTimeEvolution, TTNTimeEvolutionConfig
 from ..Subspace_expansion import KrylovBasisMode 
@@ -29,14 +29,14 @@ class OneSiteTDVP(TDVPAlgorithm):
                  hamiltonian: TTNO,
                  time_step_size: float, final_time: float,
                  operators: Union[TensorProduct, List[TensorProduct]],
-                 num_vecs: int = 3, 
-                 tau: float = 1e-2, 
-                 SVDParameters : SVDParameters = SVDParameters(),
+                 num_vecs: int , 
+                 tau: float , 
+                 SVDParameters : SVDParameters,
                  expansion_steps: int = 10,
                  initial_tol: float = 1e-5,
                  tol_step: float = 1, 
-                 rel_tot_bond: int = 5,
-                 max_bond: int = 32,
+                 rel_tot_bond_ttn : int = 5,
+                 max_bond_ttn: int = 32,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                
                  config: Union[TTNTimeEvolutionConfig,None] = None) -> None:
         
@@ -50,8 +50,8 @@ class OneSiteTDVP(TDVPAlgorithm):
         self.expansion_steps = expansion_steps   
         self.initial_tol = initial_tol
         self.tol_step = tol_step 
-        self.rel_tot_bond = rel_tot_bond
-        self.max_bond = max_bond  
+        self.rel_tot_bond_ttn = rel_tot_bond_ttn
+        self.max_bond_ttn = max_bond_ttn
         self.KrylovBasisMode = KrylovBasisMode
     """
     The mother class for all One-Site TDVP algorithms.

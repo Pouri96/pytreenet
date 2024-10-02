@@ -198,9 +198,9 @@ class SVDParameters:
             is scaled to have the same norm as the original vector. Defaults to
             True.
     """
-    max_bond_dim: int = 100
-    rel_tol: float = 0.01
-    total_tol: float = 1e-15
+    max_bond_dim: int 
+    rel_tol: float 
+    total_tol: float 
     renorm: bool = True
 
     def __post_init__(self):
@@ -333,8 +333,8 @@ class ContractionMode(Enum):
 def contr_truncated_svd_splitting(tensor: np.ndarray,
                                   u_legs: Tuple[int,...],
                                   v_legs: Tuple[int,...],
-                                  contr_mode: ContractionMode = ContractionMode.VCONTR,
-                                  svd_params: SVDParameters = SVDParameters()) -> Tuple[np.ndarray,np.ndarray]:
+                                  svd_params: SVDParameters,
+                                  contr_mode: ContractionMode = ContractionMode.VCONTR) -> Tuple[np.ndarray,np.ndarray]:
     """
     Performs a truncated singular value decomposition, but the singular values
      are contracted with the V tensor.

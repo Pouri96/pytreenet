@@ -8,7 +8,7 @@ from ..util.tensor_splitting import (SplitMode , truncated_tensor_svd)
 from ..ttns import TreeTensorNetworkState
 from ..util.tensor_splitting import SVDParameters
 from ..util.tensor_util import compute_transfer_tensor
-from ..ttno.ttno import TTNO
+from ..ttno.ttno_class import TTNO
 from ..util.tensor_splitting import SVDParameters , ContractionMode
 from ..time_evolution.time_evo_util.update_path import TDVPUpdatePathFinder
 from ..core.leg_specification import LegSpecification
@@ -23,23 +23,20 @@ def Krylov_basis(ttn: TreeTensorNetworkState,
                  tau: float, 
                  SVDParameters : SVDParameters):
    ttn_copy = deepcopy(ttn)
+   ttn_structure = deepcopy(ttn)
    ttno_copy = deepcopy(ttno)
 
    I = TTNO.Identity(ttno_copy)
    ttno_copy.multiply_const(-1j*tau) 
    ttno_copy = sum_two_ttns(I, ttno_copy)
    
-   
    if ttn_copy.orthogonality_center_id is not TDVPUpdatePathFinder(ttn_copy).find_path()[0]:
-        ttn_structure = deepcopy(ttn_copy)
         ttn_copy.canonical_form(TDVPUpdatePathFinder(ttn_copy).find_path()[0] , SplitMode.REDUCED) 
         ttn_copy = adjust_ttn1_structure_to_ttn2(ttn_copy,ttn_structure) 
-
    basis_list = [ttn_copy]
    for _ in range(num_vecs):
       ttno_copy = adjust_ttno_structure_to_ttn(ttno_copy,ttn_copy)
       ttn_copy = contract_ttno_with_ttn(ttno_copy,ttn_copy)
-      ttn_structure = deepcopy(ttn_copy)
       ttn_copy.canonical_form(TDVPUpdatePathFinder(ttn_copy).find_path()[0] , SVDParameters)  
       ttn_copy = adjust_ttn1_structure_to_ttn2(ttn_copy,ttn_structure)
       # ttn_copy.normalize_ttn()
@@ -83,10 +80,6 @@ def expand_subspace(ttn: TreeTensorNetworkState,
                     increase_fraction: float, 
                     max_iter: int,
                     mode: KrylovBasisMode ):
-    #ttno = adjust_ttno_structure_to_ttn(ttno , ttn)
-    #ttn , dict1 = max_two_neighbour_form(ttn)
-    #ttno , dict2 = max_two_neighbour_form(ttno , dict1) 
-    #assert dict1 == dict2
     if mode == KrylovBasisMode.apply_ham:
         basis = Krylov_basis2(ttn,ttno,num_vecs,SVDParameters)    
     elif mode == KrylovBasisMode.apply_1st_order_expansion:
@@ -107,7 +100,6 @@ def enlarge_ttn1_bond_with_ttn2_Lanczos(ttn1, ttn2, tol, Lanczos_threshold , k_f
 
    for i,node_id in enumerate(path_main[:-1]): 
         next_node_id = path_next[i][0]
-
         index = ttn1_copy.nodes[node_id].neighbour_index(next_node_id)
         index_prime = ttn1_copy.nodes[next_node_id].neighbour_index(node_id) 
         pho_A = compute_transfer_tensor(ttn1_copy.tensors[node_id],(index,))
@@ -120,8 +112,8 @@ def enlarge_ttn1_bond_with_ttn2_Lanczos(ttn1, ttn2, tol, Lanczos_threshold , k_f
         ttn3.nodes[node_id].link_tensor(v)
 
         v_legs = list(range(0,v.ndim))
-        v_legs.remove(index) 
-
+        v_legs.remove(index)
+        # print( ttn1_copy.tensors[node_id].shape , np.conjugate(v).shape , v_legs)
         CVd = np.tensordot(ttn1_copy.tensors[node_id] , np.conjugate(v) , (v_legs,v_legs))
         ttn1_copy.tensors[next_node_id] = absorb_matrix_into_tensor(CVd, ttn1_copy.tensors[next_node_id], (0,index_prime))
         CVd = np.tensordot(ttn2.tensors[node_id] , np.conjugate(v) , (v_legs,v_legs))
@@ -516,11 +508,11 @@ def max_two_neighbour_form(ttn , node_order = None):
         if node.nneighbours() > 2:
             neighbour_id = node_order[node_id]
             u_legs, v_legs = build_qr_leg_specs2(node, neighbour_id)
-            state.split_node_svd(node_id, u_legs, v_legs,
-                u_identifier=  node_id + "_u",
-                v_identifier=node_id,
-                svd_params = SVDParameters(max_bond_dim= np.inf, rel_tol= -np.inf, total_tol= -np.inf),
-                contr_mode = ContractionMode.VCONTR)
+            state.split_node_svd(node_id,svd_params = SVDParameters(max_bond_dim= np.inf, rel_tol= -np.inf, total_tol= -np.inf),
+                                 u_legs = u_legs, v_legs = v_legs,
+                                    u_identifier=  node_id + "_u",
+                                    v_identifier=node_id,
+                                    contr_mode = ContractionMode.VCONTR)
             shape = state.tensors[ node_id + "_u"].shape
             if isinstance(state , TreeTensorNetworkState):
                 T = state.tensors[ node_id + "_u"].reshape(shape + (1,))
@@ -531,6 +523,7 @@ def max_two_neighbour_form(ttn , node_order = None):
                 state.tensors[ node_id + "_u"] = T 
                 state.nodes[ node_id + "_u"].link_tensor(T)
             dict[node_id] = neighbour_id
+    state.orthogonality_center_id = None        
     return state , dict
 
 def random_order_generator(ttn):
