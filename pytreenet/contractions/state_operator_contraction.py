@@ -258,15 +258,15 @@ def expectation_value_Lindblad(ttn: TreeTensorNetworkState,
     nneighbours = state.nodes[state.root_id].nneighbours()
     permutation = permutation + (len(permutation), len(permutation)+1)
     op_tensor = np.transpose(op_tensor, permutation)
-
+    
     shape = list(op_tensor.shape)
     shape.pop(0)
     shape = tuple(shape)
     op_tensor = np.reshape(op_tensor, shape)
     
     ham_legs = tuple(range(0,nneighbours-1 )) + (_node_operator_input_leg(op_node)-1,)
-    #block_legs = tuple(2*i+1 for i in range(nneighbours-1)) + (ket_neigh_block.ndim - 1,)
-    block_legs = (1,3,5)
+    block_legs = tuple(2*i+1 for i in range(nneighbours-1)) + (ket_neigh_block.ndim - 1,)
+    #block_legs = (1,3,5)
     kethamblock = np.tensordot(ket_neigh_block, op_tensor,
                             axes=(block_legs, ham_legs))
     state_legs = tuple(range(0, nneighbours+1))
@@ -488,6 +488,14 @@ def contract_leaf(node_id: str,
                                      _node_operator_input_leg(ham_node)-1))
     return bra_ham_ket
 
+def transpose_last_two(tensor):
+    # Ensure the last two dimensions are (2, 2)
+    if tensor.shape[-2:] != (2, 2):
+        raise ValueError("The last two dimensions must be (2, 2)")
+
+    # Use swapaxes to swap the last two dimensions
+    transposed_tensor = tensor.swapaxes(-1, -2)
+    return transposed_tensor
 
 def contract_leaf_Lindblad(node_id1: str,
                            node_id2: str,
@@ -529,6 +537,9 @@ def contract_leaf_Lindblad(node_id1: str,
     ket_node, ket_tensor = state[node_id1]
     bra_tensor = state.tensors[node_id2]
     ham_node, ham_tensor = operator[node_id1]
+
+    # ham_tensor = transpose_last_two(ham_tensor)
+
     bra_ham = np.tensordot(ham_tensor, bra_tensor,
                            axes=(_node_operator_output_leg(ham_node),
                                  _node_state_phys_leg(ket_node)))
@@ -585,6 +596,7 @@ def contract_subtrees_using_dictionary(node_id: str, ignored_node_id: str,
                                                          ignored_node_id,
                                                          dictionary)
     op_node, op_tensor = operator[node_id]
+    # op_tensor = transpose_last_two(op_tensor)
     tensor = contract_operator_tensor_ignoring_one_leg(tensor,
                                                        ket_node,
                                                        op_tensor,
