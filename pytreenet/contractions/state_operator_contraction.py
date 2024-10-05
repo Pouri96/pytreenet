@@ -42,7 +42,7 @@ def expectation_value(state: TreeTensorNetworkState,
         node = state.nodes[node_id]
         parent_id = node.parent
         # Due to the linearisation the children should already be contracted.
-        block = contract_any(node_id, parent_id,
+        block = contract_any_SO(node_id, parent_id,
                              state, operator,
                              dictionary)
         dictionary.add_entry(node_id,parent_id,block)
@@ -51,7 +51,7 @@ def expectation_value(state: TreeTensorNetworkState,
         for child_id in children:
             dictionary.delete_entry(child_id,node_id)
     # Now everything remaining is contracted into the root tensor.
-    return complex(contract_node_with_environment(state.root_id,
+    return complex(contract_node_with_environment_SO(state.root_id,
                                                   state, operator,
                                                   dictionary))
 
@@ -267,6 +267,7 @@ def expectation_value_Lindblad(ttn: TreeTensorNetworkState,
     ham_legs = tuple(range(0,nneighbours-1 )) + (_node_operator_input_leg(op_node)-1,)
     block_legs = tuple(2*i+1 for i in range(nneighbours-1)) + (ket_neigh_block.ndim - 1,)
     #block_legs = (1,3,5)
+    #ham_legs = (0,1,2)
     kethamblock = np.tensordot(ket_neigh_block, op_tensor,
                             axes=(block_legs, ham_legs))
     state_legs = tuple(range(0, nneighbours+1))
@@ -304,7 +305,7 @@ def contract_all_except_root(state: ptn.TreeTensorNetworkState,
         node = state.nodes[node_id1]
         parent_id = node.parent
         # Due to the linearisation the children should already be contracted.
-        block = contract_any_Lindblad(node_id1, node_id2, parent_id,
+        block = contract_any_SO_Lindblad(node_id1, node_id2, parent_id,
                               state, operator,
                               dictionary)
         dictionary.add_entry(node_id1, parent_id, block)
@@ -314,7 +315,7 @@ def contract_all_except_root(state: ptn.TreeTensorNetworkState,
             dictionary.delete_entry(child_id, node_id1)
     return dictionary
 
-def contract_node_with_environment(node_id: str,
+def contract_node_with_environment_SO(node_id: str,
                                    state: TreeTensorNetworkState,
                                    operator: TTNO,
                                    dictionary: PartialTreeCachDict) -> np.ndarray:
@@ -370,7 +371,7 @@ def contract_node_with_environment(node_id: str,
     return np.tensordot(bra_tensor, kethamblock,
                         axes=(state_legs,state_legs))
 
-def contract_any(node_id: str, next_node_id: str,
+def contract_any_SO(node_id: str, next_node_id: str,
                  state: TreeTensorNetworkState,
                  operator: TTNO,
                  dictionary: PartialTreeCachDict) -> np.ndarray:
@@ -397,14 +398,14 @@ def contract_any(node_id: str, next_node_id: str,
     """
     node = state.nodes[node_id]
     if node.is_leaf():
-        return contract_leaf(node_id, state, operator)
-    return contract_subtrees_using_dictionary(node_id,
+        return contract_leaf_SO(node_id, state, operator)
+    return contract_subtrees_using_dictionary_SO(node_id,
                                               next_node_id,
                                               state,
                                               operator,
                                               dictionary)
 
-def contract_any_Lindblad(node_id1: str,
+def contract_any_SO_Lindblad(node_id1: str,
                          node_id2: str, 
                          next_node_id: str,
                          state: TreeTensorNetworkState,
@@ -433,15 +434,15 @@ def contract_any_Lindblad(node_id1: str,
     """
     node = state.nodes[node_id1]
     if node.is_leaf():
-        return contract_leaf_Lindblad(node_id1,node_id2, state, operator)
-    return contract_subtrees_using_dictionary_Lindblad(node_id1,
+        return contract_leaf_SO_Lindblad(node_id1,node_id2, state, operator)
+    return contract_subtrees_using_dictionary_SO_Lindblad(node_id1,
                                                        node_id2,
                                                        next_node_id,
                                                        state,
                                                        operator,
                                                        dictionary)
 
-def contract_leaf(node_id: str,
+def contract_leaf_SO(node_id: str,
                   state: TreeTensorNetworkState,
                   operator: TTNO) -> np.ndarray:
     """
@@ -497,7 +498,7 @@ def transpose_last_two(tensor):
     transposed_tensor = tensor.swapaxes(-1, -2)
     return transposed_tensor
 
-def contract_leaf_Lindblad(node_id1: str,
+def contract_leaf_SO_Lindblad(node_id1: str,
                            node_id2: str,
                            state: TreeTensorNetworkState,
                            operator: TTNO) -> np.ndarray:
@@ -549,7 +550,7 @@ def contract_leaf_Lindblad(node_id1: str,
     return bra_ham_ket
 
 
-def contract_subtrees_using_dictionary(node_id: str, ignored_node_id: str,
+def contract_subtrees_using_dictionary_SO(node_id: str, ignored_node_id: str,
                                        state: TreeTensorNetworkState,
                                        operator: TTNO,
                                        dictionary: PartialTreeCachDict) -> np.ndarray:
@@ -608,7 +609,7 @@ def contract_subtrees_using_dictionary(node_id: str, ignored_node_id: str,
                                               ket_node,
                                               ignored_node_id)
 
-def contract_subtrees_using_dictionary_Lindblad(node_id1: str,
+def contract_subtrees_using_dictionary_SO_Lindblad(node_id1: str,
                                        node_id2: str,
                                        ignored_node_id: str,
                                        state: TreeTensorNetworkState,

@@ -324,7 +324,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if np.abs(np.abs(I_ex) - 1)  > self.norm_tol:
                 orth_center_id_1 = self.state.root_id
                 orth_center_id_2 = orth_center_id_1.replace('Site', 'Node')
-                #self.state = normalize_ttn_Lindblad_3(ttn_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
+                #self.state = normalize_ttn_Lindblad_3_conj(ttn_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
                 #self.state = normalize_ttn_Lindblad_1_conj(ttn_copy_1) # better than 1 and 4
 
                 update_path_0 = self.update_path[0]
