@@ -114,6 +114,7 @@ def enlarge_ttn1_bond_with_ttn2_Lanczos(ttn1, ttn2, tol, Lanczos_threshold , k_f
         v_legs = list(range(0,v.ndim))
         v_legs.remove(index)
         # print( ttn1_copy.tensors[node_id].shape , np.conjugate(v).shape , v_legs)
+        # print("node_id",node_id)
         CVd = np.tensordot(ttn1_copy.tensors[node_id] , np.conjugate(v) , (v_legs,v_legs))
         ttn1_copy.tensors[next_node_id] = absorb_matrix_into_tensor(CVd, ttn1_copy.tensors[next_node_id], (0,index_prime))
         CVd = np.tensordot(ttn2.tensors[node_id] , np.conjugate(v) , (v_legs,v_legs))

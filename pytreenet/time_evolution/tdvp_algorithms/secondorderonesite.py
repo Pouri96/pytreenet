@@ -325,8 +325,8 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if np.abs(np.abs(I_ex) - 1)  > self.norm_tol:
                 orth_center_id_1 = self.state.root_id
                 orth_center_id_2 = orth_center_id_1.replace('Site', 'Node')
-                #self.state = normalize_ttn_Lindblad_3_conj(ttn_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
-                self.state = normalize_ttn_Lindblad_1(ttn_copy_1) # better than 1 and 4
+                #self.state = normalize_ttn_Lindblad_3(ttn_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
+                #self.state = normalize_ttn_Lindblad_1_conj(ttn_copy_1) # better than 1 and 4
 
                 update_path_0 = self.update_path[0]
                 #self.state = normalize_ttn_Lindblad_4(ttn_copy_1 , update_path_0)                 
@@ -335,11 +335,12 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             else:
                 self.state = ttn_copy_1  
                 norm = ttn_copy_1.operator_expectation_value_Lindblad(I)
+                #print("Norm :" ,norm, np.abs(norm))
 
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
-                current_results = self.evaluate_operators()
-                print("M :" , current_results[0])
+                current_results = self.evaluate_operators() / norm
+                #print("M :" , current_results[0])
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size  

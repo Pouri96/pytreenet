@@ -15,7 +15,7 @@ from ...util.tensor_util import tensor_matricisation_half
 from ...util.tensor_splitting import SplitMode
 from ...core.leg_specification import LegSpecification
 from ...util.ttn_exceptions import NoConnectionException
-from ...contractions.state_operator_contraction import contract_any
+from ...contractions.state_operator_contraction import contract_any_SO
 from ...util.tensor_splitting import (SplitMode,SVDParameters)
 from ...operators.tensorproduct import TensorProduct
 from ...ttno.ttno_class import TTNO
@@ -149,7 +149,7 @@ class OneSiteTDVP(TDVPAlgorithm):
             next_node_id (str): Next node to which the link is found
         """
         link_id = self.create_link_id(node_id, next_node_id)
-        new_tensor = contract_any(node_id, link_id,
+        new_tensor = contract_any_SO(node_id, link_id,
                                   self.state, self.hamiltonian,
                                   self.partial_tree_cache)
         self.partial_tree_cache.add_entry(node_id, next_node_id, new_tensor)

@@ -19,7 +19,7 @@ from ...ttns import TreeTensorNetworkState
 from ...ttno.ttno_class import TTNO
 from ...operators.tensorproduct import TensorProduct
 from ...contractions.tree_cach_dict import PartialTreeCachDict
-from ...contractions.state_operator_contraction import contract_any
+from ...contractions.state_operator_contraction import contract_any_SO
 from ..time_evo_util.update_path import TDVPUpdatePathFinder
 from ...core.canonical_form import adjust_ttn1_structure_to_ttn2 , adjust_ttno_structure_to_ttn
 
@@ -205,7 +205,7 @@ class TDVPAlgorithm(TTNTimeEvolution):
             next_node_id (str): The identifier of the node to which the open
                 legs of the tensor point.
         """
-        new_tensor = contract_any(node_id, next_node_id,
+        new_tensor = contract_any_SO(node_id, next_node_id,
                                   self.state, self.hamiltonian,
                                   self.partial_tree_cache)
         self.partial_tree_cache.add_entry(node_id, next_node_id, new_tensor)
