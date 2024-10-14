@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Union, List, Tuple, Dict
 
 import numpy as np
-
+from copy import deepcopy
 from ..time_evolution import time_evolve
 from ..ttn_time_evolution import TTNTimeEvolution, TTNTimeEvolutionConfig
 from ...util.tensor_util import tensor_matricisation_half
@@ -21,6 +21,7 @@ from ...operators.tensorproduct import TensorProduct
 from ...contractions.tree_cach_dict import PartialTreeCachDict
 from ...contractions.state_operator_contraction import contract_any
 from ..time_evo_util.update_path import TDVPUpdatePathFinder
+from ...core.canonical_form import adjust_ttn1_structure_to_ttn2 , adjust_ttno_structure_to_ttn
 
 class TDVPAlgorithm(TTNTimeEvolution):
     """
@@ -69,11 +70,17 @@ class TDVPAlgorithm(TTNTimeEvolution):
                          config)
         self.update_path = self._finds_update_path()
         self.orthogonalization_path = self._find_tdvp_orthogonalization_path(self.update_path)
-        self._orthogonalize_init()
+        #self._orthogonalize_init()
 
         # Caching for speed up
         self.partial_tree_cache = PartialTreeCachDict()
-        self._init_partial_tree_cache()
+        #self._init_partial_tree_cache()
+
+
+    def adjust_to_initial_structure(self):
+        ttn_structure = deepcopy(self.initial_state)
+        self.hamiltonian = adjust_ttno_structure_to_ttn(self.hamiltonian, ttn_structure)
+        self.state = adjust_ttn1_structure_to_ttn2(self.state, ttn_structure)
 
     def _orthogonalize_init(self, force_new: bool=False):
         """

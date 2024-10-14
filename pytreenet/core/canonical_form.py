@@ -19,7 +19,8 @@ from ..util.tensor_splitting import SplitMode
 from ..util.tensor_splitting import (SVDParameters , tensor_qr_decomposition, truncated_tensor_svd, ContractionMode)
 from ..util import compute_transfer_tensor
 from ..core.graph_node import GraphNode
-
+from ..contractions.contraction_util import get_equivalent_legs
+                                             
 def canonical_form(ttn: TreeTensorNetwork,
                    orthogonality_center_id: str,
                    mode: SplitMode = SplitMode.REDUCED,
@@ -104,51 +105,55 @@ def canonical_form_twosite(ttn: TreeTensorNetwork,
                                                   neighbour_id = minimum_distance_neighbour_id,
                                                   SVDParameters = mode,
                                                   contr_mode = contr_mode)
+    ttn.orthogonality_center_id = None            
 
+
+def cehck_two_ttn_compatibility(ttn1, ttn2):
+    for nodes in ttn1.nodes:
+        legs = get_equivalent_legs(ttn1.nodes[nodes], ttn2.nodes[nodes])
+        assert legs[0] == legs[1]
 
 def adjust_ttn1_structure_to_ttn2(ttn1, ttn2):
-    """
-    Adjusts the structure of ttn1 to match the structure of ttn2.
-
-    Args:
-        ttn1 (TTN): The original Tensor Train Network.
-        ttn2 (TTN): The target Tensor Train Network.
-
-    Returns:
-        ttn3 (TTN): The adjusted ttn1 with the structure of ttn2.
-    """
-    ttn3 = deepcopy(ttn2)
-    orth_center = ttn1.orthogonality_center_id
-    for node_id in ttn3.nodes:
-        ttn1_neighbours = ttn1.nodes[node_id].neighbouring_nodes()
-        element_map = {elem: i for i, elem in enumerate(ttn1_neighbours)}
-        ttn1_neighbours = ttn2.nodes[node_id].neighbouring_nodes()
-        permutation = tuple(element_map[elem] for elem in ttn1_neighbours)
-        nneighbours = ttn2.nodes[node_id].nneighbours()
-        ttn1_tensor = ttn1.tensors[node_id].transpose(permutation + (nneighbours,))
-        ttn3.tensors[node_id] = ttn1_tensor
-        ttn3.nodes[node_id].link_tensor(ttn1_tensor)
-    ttn3.orthogonality_center_id = orth_center    
-    return ttn3    
+    try:
+        cehck_two_ttn_compatibility(ttn1, ttn2)
+        return ttn1
+    except AssertionError:    
+        ttn3 = deepcopy(ttn2)
+        orth_center = ttn1.orthogonality_center_id
+        for node_id in ttn3.nodes:
+            ttn1_neighbours = ttn1.nodes[node_id].neighbouring_nodes()
+            element_map = {elem: i for i, elem in enumerate(ttn1_neighbours)}
+            ttn1_neighbours = ttn2.nodes[node_id].neighbouring_nodes()
+            permutation = tuple(element_map[elem] for elem in ttn1_neighbours)
+            nneighbours = ttn2.nodes[node_id].nneighbours()
+            ttn1_tensor = ttn1.tensors[node_id].transpose(permutation + (nneighbours,))
+            
+            ttn3.tensors[node_id] = ttn1_tensor
+            ttn3.nodes[node_id].link_tensor(ttn1_tensor)
+            ttn3.orthogonality_center_id = orth_center    
+        return ttn3       
 
 def adjust_ttno_structure_to_ttn(ttno, ttn):
-    ttno_copy = deepcopy(ttno)
-
-    for node_id in ttno_copy.nodes:
-        ttno_neighbours = ttno.nodes[node_id].neighbouring_nodes()
-        element_map = {elem: i for i, elem in enumerate(ttno_neighbours)}
-        ttn1_neighbours = ttn.nodes[node_id].neighbouring_nodes()
-        permutation = tuple(element_map[elem] for elem in ttn1_neighbours)
-        nneighbours = ttn.nodes[node_id].nneighbours()
-        ttno_tensor = ttno.tensors[node_id].transpose(permutation + (nneighbours,) + (nneighbours + 1,))
-        ttno_copy.tensors[node_id] = ttno_tensor
-        ttno_copy.nodes[node_id].link_tensor(ttno_tensor)
-        ttn_neighbours = ttn.nodes[node_id].neighbouring_nodes()
-        if ttno_copy.nodes[node_id].is_root():
-            ttno_copy.nodes[node_id].children = ttn_neighbours
-        else:
-            ttno_copy.nodes[node_id].children = ttn_neighbours[1:] 
-    return ttno_copy       
+    try: 
+        cehck_two_ttn_compatibility(ttno, ttn)
+        return ttno
+    except AssertionError:    
+        ttno_copy = deepcopy(ttno)
+        for node_id in ttno_copy.nodes:
+            ttno_neighbours = ttno.nodes[node_id].neighbouring_nodes()
+            element_map = {elem: i for i, elem in enumerate(ttno_neighbours)}
+            ttn1_neighbours = ttn.nodes[node_id].neighbouring_nodes()
+            permutation = tuple(element_map[elem] for elem in ttn1_neighbours)
+            nneighbours = ttn.nodes[node_id].nneighbours()
+            ttno_tensor = ttno.tensors[node_id].transpose(permutation + (nneighbours,) + (nneighbours + 1,))
+            ttno_copy.tensors[node_id] = ttno_tensor
+            ttno_copy.nodes[node_id].link_tensor(ttno_tensor)
+            ttn_neighbours = ttn.nodes[node_id].neighbouring_nodes()
+            if ttno_copy.nodes[node_id].is_root():
+                ttno_copy.nodes[node_id].children = ttn_neighbours
+            else:
+                ttno_copy.nodes[node_id].children = ttn_neighbours[1:] 
+        return ttno_copy    
 
 def _find_smallest_distance_neighbour(node: Node,
                                       distance_dict: dict[str, int]) -> str:

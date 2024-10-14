@@ -19,6 +19,7 @@ from .contraction_util import (contract_all_but_one_neighbour_block_to_ket,
                                contract_all_neighbour_blocks_to_ket, 
                                contract_all_neighbour_blocks_to_ket_Lindblad) 
 from .state_operator_contraction import adjust_bra_to_ket
+from copy import deepcopy
 
 __all__ = ['contract_two_ttns']
 
@@ -354,8 +355,14 @@ def contract_node_with_environment_Lindblad(root_id, state, dictionary):
     axes = tuple(range(0, bra_tensor.ndim))
     return np.tensordot(ket_neigh_block, bra_tensor, (axes, axes))
 
-def contract_ttn_Lindblad(state):    
-    
+def contract_ttn_Lindblad(vectorized_pho):    
+    state = deepcopy(vectorized_pho)
+    for bra_id in [node.identifier for node in state.nodes.values() if str(node.identifier).startswith("N")]:
+        T = state.tensors[bra_id].astype(complex)
+        T = T.conj()
+        state.tensors[bra_id] = T
+        state.nodes[bra_id].link_tensor(T)    
+
     adjust_bra_to_ket(state)
     dictionary = PartialTreeCachDict()
     # Getting a linear list of all identifiers

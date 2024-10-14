@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import List, Union
-from copy import deepcopy
+import copy
 from tqdm import tqdm
+from copy import deepcopy
 import numpy as np
 from dataclasses import replace
 from ...operators.tensorproduct import TensorProduct
@@ -13,17 +14,17 @@ from ...ttns import (TreeTensorNetworkState ,
                         normalize_ttn_Lindblad_3_conj ,
                      normalize_ttn_Lindblad_4 , 
                      normalize_ttn_Lindblad_5,
-                        normalize_ttn_Lindblad_5_conj)
+                        normalize_ttn_Lindblad_5_conj,
+                     normalize_ttn_Lindblad_XX ,  )
 from ..ttn_time_evolution import TTNTimeEvolutionConfig
 from ..Subspace_expansion import expand_subspace , KrylovBasisMode , max_two_neighbour_form , original_form
 from ...util.tensor_splitting import SplitMode , SVDParameters
 from ...core.canonical_form import adjust_ttn1_structure_to_ttn2 , adjust_ttno_structure_to_ttn
 from pytreenet.contractions.state_operator_contraction import adjust_operator_to_ket , adjust_bra_to_ket
+from pytreenet.contractions.state_state_contraction import contract_ttn_Lindblad
 from .onesitetdvp import OneSiteTDVP
 from ...contractions.tree_cach_dict import PartialTreeCachDict
 from ...time_evolution.time_evo_util.update_path import TDVPUpdatePathFinder
-
-
 class SecondOrderOneSiteTDVP(OneSiteTDVP):
     """
     The first order one site TDVP algorithm.
@@ -61,9 +62,9 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
 
                  initial_tol: float = 1e-20,
                  tol_step: float = 10, 
-                 rel_tot_bond_ttn : int = 30,
-                 max_bond_ttn: int = 100,
-                 normalize: str = True,
+                 rel_tot_bond : int = 30,
+                 max_bond: int = 100,
+                 norm_tol: int = 0,
                  KrylovBasisMode : KrylovBasisMode = KrylovBasisMode.apply_ham,                  
                  config: Union[TTNTimeEvolutionConfig,None] = None) -> None:
         """
@@ -87,8 +88,8 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                          expansion_steps,
                          initial_tol,
                          tol_step,
-                         rel_tot_bond_ttn,
-                         max_bond_ttn,
+                         rel_tot_bond,
+                         max_bond,
                          KrylovBasisMode,  
                          config)
         self.t3n_dict = t3n_dict
@@ -97,7 +98,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         self.validity_fraction = validity_fraction
         self.increase_fraction = increase_fraction
         self.max_iter = max_iter
-        self.normalize = normalize
+        self.norm_tol = norm_tol
 
         if self.T3NS :
            self._init_two_neighbour_form() 
@@ -320,25 +321,25 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
         for i in tqdm(range(self.num_time_steps + 1), disable=not pgbar):
             ttn_copy_1 = deepcopy(self.state)
 
-            if  self.normalize:
+            I_ex = ttn_copy_1.operator_expectation_value_Lindblad(I)              
+            if np.abs(np.abs(I_ex) - 1)  > self.norm_tol:
                 orth_center_id_1 = self.state.root_id
                 orth_center_id_2 = orth_center_id_1.replace('Site', 'Node')
-                #self.state = normalize_ttn_Lindblad_3(ttn_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
-                #self.state = normalize_ttn_Lindblad_1_conj(ttn_copy_1) # better than 1 and 4
+                #self.state = normalize_ttn_Lindblad_3_conj(ttn_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
+                self.state = normalize_ttn_Lindblad_1(ttn_copy_1) # better than 1 and 4
 
                 update_path_0 = self.update_path[0]
-                self.state = normalize_ttn_Lindblad_4(ttn_copy_1 , update_path_0)                 
+                #self.state = normalize_ttn_Lindblad_4(ttn_copy_1 , update_path_0)                 
                 norm = self.state.operator_expectation_value_Lindblad(I)
                 #print("Norm :" ,norm, np.abs(norm))
             else:
                 self.state = ttn_copy_1  
                 norm = ttn_copy_1.operator_expectation_value_Lindblad(I)
-                #print("Norm :" ,norm, np.abs(norm))
 
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
-                current_results = self.evaluate_operators() / norm
-                #print("M :" , current_results[0])
+                current_results = self.evaluate_operators()
+                print("M :" , current_results[0])
                 self._results[0:-1, index] = current_results
                 # Save current time
                 self._results[-1, index] = i*self.time_step_size  
@@ -379,7 +380,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 after_ex_total_bond_t3ns = state_ex_t3n.total_bond_dim()
                 state_ex_ttn = original_form(state_ex_t3n , self.t3n_dict)
                 expanded_dim_tot = state_ex_ttn.total_bond_dim() - ttn.total_bond_dim()
-                if  expanded_dim_tot > self.rel_tot_bond_ttn:
+                if  expanded_dim_tot > self.rel_tot_bond:
                     print("expanded_dim_tot :" , expanded_dim_tot)
                     A = True
                     # tol_prime = tol
@@ -407,12 +408,12 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                                 state_ex_ttn = ttn
                                 tol /= self.tol_step
                                 A = False
-                            elif expanded_dim_tot < self.rel_tot_bond_ttn :  
+                            elif expanded_dim_tot < self.rel_tot_bond :  
                                 A = False  
                 self._orthogonalize_init(force_new=True)                     
 
-                if self.max_bond_ttn < state_ex_ttn.total_bond_dim():
-                    print(self.max_bond_ttn , state_ex_ttn.total_bond_dim()) 
+                if self.max_bond < state_ex_ttn.total_bond_dim():
+                    print(self.max_bond , state_ex_ttn.total_bond_dim()) 
                     state_ex_ttn = ttn
                     should_expand = False
                     print("3")
@@ -429,7 +430,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                 expanded_dim_total_bond_ttn = after_ex_total_bond_ttn - before_ex_total_bond_ttn
                 expanded_dim_total_bond_t3ns = after_ex_total_bond_t3ns - before_ex_total_bond_t3ns
 
-                if self.max_bond_ttn < after_ex_total_bond_ttn:
+                if self.max_bond < after_ex_total_bond_ttn:
                     print("END :" , after_ex_total_bond_ttn)
                     should_expand = False      
                 
@@ -483,7 +484,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             if  self.normalize:
                 #orth_center_id_1 = self.state.root_id
                 #orth_center_id_2 = orth_center_id_1.replace('Site', 'Node')
-                #self.state = normalize_ttn_Lindblad_3(t3n_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
+                #self.state = normalize_ttn_Lindblad_3_conj(t3n_copy_1 , orth_center_id_1 , orth_center_id_2) # better than 1 and 4
                 #self._orthogonalize_init(force_new=True)
 
                 update_path_0 = self.update_path[0]
@@ -500,7 +501,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
 
             if evaluation_time != "inf" and i % evaluation_time == 0 and len(self._results) > 0:
                 index = i // evaluation_time
-                current_results = self.evaluate_operators() / norm
+                current_results = self.evaluate_operators()
                 #print("H :" , self.evaluate_operators()[0] / norm)
                 self._results[0:-1, index] = current_results
                 # Save current time
@@ -540,7 +541,7 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                     state_ex_t3n = t3n
                     tol /= self.tol_step
 
-                if  expanded_dim_tot > self.rel_tot_bond_ttn:
+                if  expanded_dim_tot > self.rel_tot_bond:
                     print("expanded_dim_tot :" , expanded_dim_tot)
                     A = True
                     # tol_prime = tol
@@ -568,11 +569,11 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
                                 state_ex_t3n = t3n
                                 tol /= self.tol_step
                                 A = False
-                            elif expanded_dim_tot < self.rel_tot_bond_ttn :  
+                            elif expanded_dim_tot < self.rel_tot_bond :  
                                 A = False                
 
-                if self.max_bond_ttn < state_ex_t3n.total_bond_dim():
-                    print(self.max_bond_ttn , state_ex_t3n.total_bond_dim()) 
+                if self.max_bond < state_ex_t3n.total_bond_dim():
+                    print(self.max_bond , state_ex_t3n.total_bond_dim()) 
                     state_ex_t3n = t3n
                     should_expand = False
                     print("3") 
@@ -596,5 +597,3 @@ class SecondOrderOneSiteTDVP(OneSiteTDVP):
             self._results[-1, 0] = i*self.time_step_size
         if filepath != "":
             self.save_results_to_file(filepath)   
-
-                       

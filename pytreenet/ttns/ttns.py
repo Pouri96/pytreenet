@@ -281,5 +281,25 @@ def normalize_ttn_Lindblad_5(ttn) :
 
     return ttn_normalized
 
+import pytreenet as ptn
+def normalize_ttn_Lindblad_XX(vectorized_pho , orth_center_id_1 , orth_center_id_2): 
+    pho_normalized_str = deepcopy(vectorized_pho)
+    pho_normalized = deepcopy(vectorized_pho)
+    pho_normalized.canonical_form_twosite( orth_center_id_1, orth_center_id_2,mode = SplitMode.REDUCED)
+    pho_normalized = ptn.adjust_ttn1_structure_to_ttn2(pho_normalized , pho_normalized_str)
+    pho_normalized_conj = pho_normalized.conjugate()
+    norm = contract_two_ttns(pho_normalized_conj , pho_normalized)
+    norm = np.sqrt(norm)
+    T = pho_normalized.tensors[orth_center_id_1].astype(complex)
+    T /= np.sqrt(norm)
+    pho_normalized.tensors[orth_center_id_1] = T
+    pho_normalized.nodes[orth_center_id_1].link_tensor(T)
+
+    T = pho_normalized.tensors[orth_center_id_2].astype(complex)
+    T /= np.sqrt(norm).conj()
+    pho_normalized.tensors[orth_center_id_2] = T
+    pho_normalized.nodes[orth_center_id_2].link_tensor(T)
+    return pho_normalized
+
 TTNS = TreeTensorNetworkState
 
